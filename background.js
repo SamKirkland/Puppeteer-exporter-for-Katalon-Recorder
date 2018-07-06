@@ -111,6 +111,7 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
         var mimetype = '';
         switch (payload.capabilityId) {
             case 'puppeteer':
+				debugger;
                 let seleniumToPuppeteer = {
                     "open": (x) => `await page.goto('${x.target}');`,
                     "click": (x) => `await page.waitForSelector(\`[${x.target}]\`);\n\tawait page.click('[${x.target}]');`,
@@ -120,6 +121,32 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
                     "sendkeys": (x) => `await page.waitForSelector(\`[${x.target}]\`);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);`,
+                    "captureScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.goto(page.url());\nawait page.screenshot({ path: name });`,
+                    "captureEntirePageScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.screenshot({ path: name, fullPage: true }); `,
+                    "bringBrowserToForeground": (x) => `await page.bringToFront();`,
+                    "refresh": (x) => `await page.reload();`,
+                    "selectWindow": (x) => `if (${x.target}.substring(4).toLowerCase() === 'open') {\n
+                        var newTab = await page.browser().newPage();\n
+                        await newTab.setViewport(page.viewport());\n
+                        await newTab.goto(${x.value}, { waitUntil: 'networkidle2' });\n
+                        await newTab.bringToFront();\n
+                        await browserTabs.push(newTab);\n
+                        page = newTab;\n
+                    } else if (${x.target}.substring(4).toLowerCase() === 'closealltogether') {\n
+                        for (var i = 0; i < browserTabs.length; i++) {\n
+                            if (browserTabs[i] !== page) {\n
+                                await browserTabs[i].close();\n
+                            }\n
+                        }\n
+                        var newTabs = [page];\n
+                        browserTabs = [];\n
+                        browserTabs = newTabs;\n
+                    } else if (parseInt(${x.target}.substring(4)) >= 0) {\n
+                        var goto = parseInt(target.substring(4));\n
+                        await browserTabs[goto].bringToFront();\n
+                        page = browserTabs[goto];\n
+                        await page.waitFor(1000);\n
+                    }`,
                 }
                 
                 let convertedCommands = commands.map((c) => {
@@ -145,7 +172,9 @@ let KEY_DELETE = "\\uE017"; let KEY_DEL = KEY_DELETE;
 
 (async () => {
 	let browser = await puppeteer.launch({headless: false});
-    const page = await browser.newPage();
+    var page = await browser.newPage();
+    var browserTabs = [];
+    browserTabs.push(page);
 
     // exported test
     ${convertedCommands.join('\n\t')}
