@@ -122,7 +122,7 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
                     "type": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.type(selector, \`${x.value}\`);`,
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
-                    "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);`,
+                    "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);\n\tawait waitForPageEnter(\`${x.value}\`);`,
                     "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};`
                 }
                 
@@ -191,7 +191,18 @@ function locatorToSelector(target) {
     // exported test
     ${convertedCommands.join('\n\t')}
 
-    await browser.close()
+    // helper function for enter button to wait
+    async function waitForPageEnter(value) {
+		console.log(value);
+		if(value === \`\${KEY_ENTER}\`) {
+			await console.log("ya we waitin");
+			await page.waitForNavigation({ timeout: 4500 });
+		}
+
+    }
+
+    await browser.close();
+    
 })()`;
 
 			
