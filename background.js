@@ -148,6 +148,7 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
                         \tawait page.waitFor(1000);\n
                     }`,
                     "pause": (x) => `await page.waitFor(parseInt(${x.target}));`,
+                    "mouseOver": () => `var path = await locatorToSelector(${x.target});\nvar container = await getContainer(path);\nawait container.hover(path);`
                   
                 }
                 
@@ -172,11 +173,47 @@ let KEY_SHIFT = "\\uE008";
 let KEY_ESC = "\\uE00C"; let KEY_ESCAPE = KEY_ESC;
 let KEY_DELETE = "\\uE017"; let KEY_DEL = KEY_DELETE;
 
+async function getContainer(selector) {
+    //returns previous index if not found
+    var elementhandle = await page.$(selector);
+
+    if (elementhandle) {
+        return page;
+    } else {
+        var frames = await page.frames();
+        var i, length = frames.length;
+        for (i = 0; i < length; i++) {
+            elementhandle = await frames[i].$(selector);
+
+            if (elementhandle) {
+                return frames[i];
+            } else if (i === length - 1) {
+                return frames[length - 1];
+            }
+        }
+    }
+}
+
 (async () => {
-	let browser = await puppeteer.launch({headless: false});
+	let browser = await puppeteer.launch({headless: false, args:['--start-maximized']});
     var page = await browser.newPage();
+
+    await page._client.send('Emulation.clearDeviceMetricsOverride');
+    var winWidth = await page.evaluate(
+        () => {
+            return window.innerWidth;
+        }
+    );
+    var winHeight = await page.evaluate(
+        () => {
+            return window.innerHeight;
+        }
+    );
+    await page.setViewport({ width: winWidth, height: winHeight });
+
     var browserTabs = [];
     browserTabs.push(page);
+
 
     // exported test
     ${convertedCommands.join('\n\t')}
