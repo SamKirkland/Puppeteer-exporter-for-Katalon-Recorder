@@ -111,15 +111,19 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
         var mimetype = '';
         switch (payload.capabilityId) {
             case 'puppeteer':
+			debugger;
+			
+			
                 let seleniumToPuppeteer = {
                     "open": (x) => `await page.goto('${x.target}');`,
-                    "click": (x) => `await page.waitForSelector(\`[${x.target}]\`);\n\tawait page.click('[${x.target}]');`,
+                    "click": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.click(selector);`,
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
-                    "type": (x) => `await page.focus(\`[${x.target}]\`);\n\tawait page.type(\`${x.value}\`);`,
+                    "type": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.type(selector, \`${x.value}\`);`,
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
-                    "sendkeys": (x) => `await page.waitForSelector(\`[${x.target}]\`);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);`,
+                    "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);`,
+                    "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};`
                 }
                 
                 let convertedCommands = commands.map((c) => {
@@ -133,6 +137,7 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
 
 content =
 `const puppeteer = require('puppeteer');
+var xpath2css = require('xpath2css');
 
 // built in selenium vars
 // https://github.com/Jongkeun/selenium-ide/blob/6d18a36991a9541ab3e9cad50c2023b0680e497b/packages/selenium-ide/src/content/selenium-api.js
@@ -143,9 +148,45 @@ let KEY_SHIFT = "\\uE008";
 let KEY_ESC = "\\uE00C"; let KEY_ESCAPE = KEY_ESC;
 let KEY_DELETE = "\\uE017"; let KEY_DEL = KEY_DELETE;
 
+// xpath to css
+function locatorToSelector(target) {
+    var selector;
+
+    if (target.substring(0, 1) === "/" || target.substring(0, 6) === "xpath=") {
+        if (target.indexOf('@') != target.lastIndexOf('@')) {
+            var attributeSelector = target.substring(target.lastIndexOf('@'), target.length);
+            target = target.substring(0, target.lastIndexOf('@'));
+            selector = xpath2css(target);
+            selector += attributeSelector;
+        } else {
+            selector = xpath2css(target);
+        }
+    } else if (target.substring(0, 3) === "id=") {
+        selector = "[id=" + target.substring(3, target.length) + "]";
+    } else if (target.substring(0, 5) === "name=") {
+        selector = "[name=" + target.substring(5, target.length) + "]";
+    } else if (target.substring(0, 5) === "link=") {
+        selector = "[link=" + target.substring(5, target.length) + "]";
+        //Probably does not work, if meant to be used for ref attributes
+    } else if (target.substring(0, 11) === "identifier=") {
+        selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
+    } else if (target.substring(0, 4) === "dom=") {
+        //TODO
+    } else if (target.substring(0, 4) === "css=") {
+        selector = target.substring(4, target.length);
+    } else if (target.substring(0, 3) === "ui=") {
+        //TODO
+    } else {
+        selector = target;
+    }
+
+    return selector;
+}
+
 (async () => {
 	let browser = await puppeteer.launch({headless: false});
     const page = await browser.newPage();
+    var selector = null;
 
     // exported test
     ${convertedCommands.join('\n\t')}
