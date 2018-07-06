@@ -114,42 +114,63 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
 				debugger;
                 let seleniumToPuppeteer = {
                     "open": (x) => `await page.goto('${x.target}');`,
-                    "click": (x) => `await page.waitForSelector(\`[${x.target}]\`);\n\tawait page.click('[${x.target}]');`,
+                    "click": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.click(selector);`,
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
-                    "type": (x) => `await page.focus(\`[${x.target}]\`);\n\tawait page.type(\`${x.value}\`);`,
+                    "type": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.type(selector, \`${x.value}\`);`,
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
-                    "sendkeys": (x) => `await page.waitForSelector(\`[${x.target}]\`);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);`,
+                    "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);`,
+                    "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};`,
                     "captureScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.goto(page.url());\nawait page.screenshot({ path: name });`,
                     "captureEntirePageScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.screenshot({ path: name, fullPage: true }); `,
                     "bringBrowserToForeground": (x) => `await page.bringToFront();`,
                     "refresh": (x) => `await page.reload();`,
                     "selectWindow": (x) => `if (${x.target}.substring(4).toLowerCase() === 'open') {\n
-                        \tvar newTab = await page.browser().newPage();\n
-                        \tawait newTab.setViewport(page.viewport());\n
-                        \tawait newTab.goto(${x.value}, { waitUntil: 'networkidle2' });\n
-                        \tawait newTab.bringToFront();\n
-                        \tawait browserTabs.push(newTab);\n
-                        \tpage = newTab;\n
-                    } else if (${x.target}.substring(4).toLowerCase() === 'closealltogether') {\n
-                        \tfor (var i = 0; i < browserTabs.length; i++) {\n
-                            \t\tif (browserTabs[i] !== page) {\n
-                                \t\t\tawait browserTabs[i].close();\n
-                            \t\t}\n
-                        }\n
-                        \tvar newTabs = [page];\n
-                        \tbrowserTabs = [];\n
-                        \tbrowserTabs = newTabs;\n
-                    } else if (parseInt(${x.target}.substring(4)) >= 0) {\n
-                        \tvar goto = parseInt(target.substring(4));\n
-                        \tawait browserTabs[goto].bringToFront();\n
-                        \tpage = browserTabs[goto];\n
-                        \tawait page.waitFor(1000);\n
+                        var newTab = await page.browser().newPage();
+                        await newTab.setViewport(page.viewport());
+                        await newTab.goto(${x.value}, { waitUntil: 'networkidle2' });
+                        await newTab.bringToFront();
+                        await browserTabs.push(newTab);
+                        page = newTab;
+                    } else if (${x.target}.substring(4).toLowerCase() === 'closealltogether') {
+                        for (var i = 0; i < browserTabs.length; i++) {
+                            if (browserTabs[i] !== page) {
+                                await browserTabs[i].close();
+                            }
+                        }
+                        var newTabs = [page];
+                        browserTabs = [];
+                        browserTabs = newTabs;
+                    } else if (parseInt(${x.target}.substring(4)) >= 0) {
+                        var goto = parseInt(target.substring(4));
+                        await browserTabs[goto].bringToFront();
+                        page = browserTabs[goto];
+                        await page.waitFor(1000);
                     }`,
                     "pause": (x) => `await page.waitFor(parseInt(${x.target}));`,
-                    "mouseOver": () => `var path = await locatorToSelector(${x.target});\nvar container = await getContainer(path);\nawait container.hover(path);`
-                  
+                    "mouseOver": (x) => `var path = await locatorToSelector(${x.target});\nvar container = await getContainer(path);\nawait container.hover(path);`,
+                    "deleteAllVisibleCookies": (x) => `for (var i = 0; i < browserTabs.length; i++) {
+                        await browserTabs[i]._client.send('Network.clearBrowserCookies');
+                    }`,
+                    "echo": (x) => `var path, container;
+                    if (value !== "#shownotification") {
+                        path = await locatorToSelector(${x.target});
+                        container = await getContainer(path);
+                    } else {
+                        container = page;
+                    }
+            
+                    if (container.evaluate('Notification.permission !== "granted"') && value === "#shownotification") {
+                        await container.evaluate('Notification.requestPermission()');
+                        await container.evaluate(t => {
+                            new Notification('Notification title', { body: t });
+                        }, ${x.target});
+                    } else if (value === "#shownotification") { //notification access already granted.
+                        await container.evaluate(t => {
+                            new Notification('Notification title', { body: t });
+                        }, ${x.target});
+                    }`
                 }
                 
                 let convertedCommands = commands.map((c) => {
@@ -192,6 +213,40 @@ async function getContainer(selector) {
             }
         }
     }
+}
+
+function locatorToSelector(target) {
+    var selector;
+
+    if (target.substring(0, 1) === "/" || target.substring(0, 6) === "xpath=") {
+        if (target.indexOf('@') != target.lastIndexOf('@')) {
+            var attributeSelector = target.substring(target.lastIndexOf('@'), target.length);
+            target = target.substring(0, target.lastIndexOf('@'));
+            selector = xpath2css(target);
+            selector += attributeSelector;
+        } else {
+            selector = xpath2css(target);
+        }
+    } else if (target.substring(0, 3) === "id=") {
+        selector = "[id=" + target.substring(3, target.length) + "]";
+    } else if (target.substring(0, 5) === "name=") {
+        selector = "[name=" + target.substring(5, target.length) + "]";
+    } else if (target.substring(0, 5) === "link=") {
+        selector = "[link=" + target.substring(5, target.length) + "]";
+        //Probably does not work, if meant to be used for ref attributes
+    } else if (target.substring(0, 11) === "identifier=") {
+        selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
+    } else if (target.substring(0, 4) === "dom=") {
+        //TODO
+    } else if (target.substring(0, 4) === "css=") {
+        selector = target.substring(4, target.length);
+    } else if (target.substring(0, 3) === "ui=") {
+        //TODO
+    } else {
+        selector = target;
+    }
+
+    return selector;
 }
 
 (async () => {
