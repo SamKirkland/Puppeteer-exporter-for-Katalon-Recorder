@@ -126,27 +126,29 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
                     "bringBrowserToForeground": (x) => `await page.bringToFront();`,
                     "refresh": (x) => `await page.reload();`,
                     "selectWindow": (x) => `if (${x.target}.substring(4).toLowerCase() === 'open') {\n
-                        var newTab = await page.browser().newPage();\n
-                        await newTab.setViewport(page.viewport());\n
-                        await newTab.goto(${x.value}, { waitUntil: 'networkidle2' });\n
-                        await newTab.bringToFront();\n
-                        await browserTabs.push(newTab);\n
-                        page = newTab;\n
+                        \tvar newTab = await page.browser().newPage();\n
+                        \tawait newTab.setViewport(page.viewport());\n
+                        \tawait newTab.goto(${x.value}, { waitUntil: 'networkidle2' });\n
+                        \tawait newTab.bringToFront();\n
+                        \tawait browserTabs.push(newTab);\n
+                        \tpage = newTab;\n
                     } else if (${x.target}.substring(4).toLowerCase() === 'closealltogether') {\n
-                        for (var i = 0; i < browserTabs.length; i++) {\n
-                            if (browserTabs[i] !== page) {\n
-                                await browserTabs[i].close();\n
-                            }\n
+                        \tfor (var i = 0; i < browserTabs.length; i++) {\n
+                            \t\tif (browserTabs[i] !== page) {\n
+                                \t\t\tawait browserTabs[i].close();\n
+                            \t\t}\n
                         }\n
-                        var newTabs = [page];\n
-                        browserTabs = [];\n
-                        browserTabs = newTabs;\n
+                        \tvar newTabs = [page];\n
+                        \tbrowserTabs = [];\n
+                        \tbrowserTabs = newTabs;\n
                     } else if (parseInt(${x.target}.substring(4)) >= 0) {\n
-                        var goto = parseInt(target.substring(4));\n
-                        await browserTabs[goto].bringToFront();\n
-                        page = browserTabs[goto];\n
-                        await page.waitFor(1000);\n
+                        \tvar goto = parseInt(target.substring(4));\n
+                        \tawait browserTabs[goto].bringToFront();\n
+                        \tpage = browserTabs[goto];\n
+                        \tawait page.waitFor(1000);\n
                     }`,
+                    "pause": (x) => `await page.waitFor(parseInt(${x.target}));`,
+                  
                 }
                 
                 let convertedCommands = commands.map((c) => {
