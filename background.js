@@ -174,6 +174,14 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
 
                     "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);\n\tawait waitForPageEnter(\`${x.value}\`);`,
                     "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};`,
+                    "assertAlert": (x) =>     ``,
+                    "assertAlert": (x) =>     ``,
+                    "assertAlert": (x) =>     ``,
+                    "assertAlert": (x) =>     ``,
+                    "assertAlert": (x) =>     ``,
+                    "assertAlert": (x) =>     ``,
+                    "assertAlert": (x) =>     ``,
+                    "assertAlert": (x) =>     ``,
                     "verifyChecked": (x) =>     `var property;
 
                                                 try {
