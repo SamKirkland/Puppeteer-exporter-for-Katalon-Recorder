@@ -29,7 +29,7 @@ function register() {
                 capabilities: [
                     {
                         id: 'puppeteer', // unique ID for each capability
-                        summary: 'Puppeteer', // user-friendly name
+                        summary: 'THIS IS A TEST', // user-friendly name
                         type: 'export' // for now only 'export' is available
                     },
                     {
