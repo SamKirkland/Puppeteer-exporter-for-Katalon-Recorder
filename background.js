@@ -117,7 +117,7 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
                     "click": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.click(selector);`,
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
-                    "type": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.type(selector, \`${x.value}\`);`,
+                    "type": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tvar container = await getContainer(\`${x.target}\`, page);\t\nawait container.type(selector, \`${x.value}\`);`,
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
                     "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);`,
@@ -184,7 +184,7 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
 
 content =
 `const puppeteer = require('puppeteer');
-
+const xpath2css = require('xpath2css');
 // built in selenium vars
 // https://github.com/Jongkeun/selenium-ide/blob/6d18a36991a9541ab3e9cad50c2023b0680e497b/packages/selenium-ide/src/content/selenium-api.js
 let KEY_BACKSPACE = "\\uE003"; let KEY_BKSP = KEY_BACKSPACE;
