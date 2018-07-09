@@ -124,95 +124,6 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                 seleniumToPuppeteer = {
                     "open": (x) => `await page.goto('${x.target}');\n`,
                     "click": (x) => `
-<<<<<<< HEAD
-                            selector = locatorToSelector(\`${x.target}\`);
-                            container = await getContainer(selector);
-                        try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
-                        }catch(error) {
-                            console.log(error);
-                            container.mouse.down();
-                        }`,
-                    "echo": (x) => `console.log('${x.target}');`,
-                    "store": (x) => `let ${x.target} = ${x.value};`,
-                    "type": (x) => `
-                        selector = locatorToSelector(\`${x.target}\`);
-                        container = await getContainer(selector);
-                        await container.type(selector, \`${x.value}\`);`,
-                    "get": (x) => `await page.goto('${x.target}');`,
-                    "comment": (x) => `// ${x.target}`,
-                    "sendkeys": (x) => `
-                        await page.keyboard.press(keyDictionary[\`${x.value}\`]);
-                        //await waitForPageEnter(\`${x.value}\`);`,
-                    "selectframe": (x) => `
-                        if(\`${x.target}\` === 'relative=parent') {
-                            page = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {
-                            page=page.frames()[parseInt('${x.target}'.substring(6))];
-                        };`,
-                    "captureScreenshot": (x) => `
-                        let name = ${x.target} + ".jpg";
-                        await page.goto(page.url());
-                        await page.screenshot({ path: name });`,
-                    "captureEntirePageScreenshot": (x) => `
-                        let name = ${x.target} + ".jpg";
-                        await page.screenshot({ path: name, fullPage: true });`,
-                    "bringBrowserToForeground": (x) => `await page.bringToFront();`,
-                    "refresh": (x) => `await page.reload();`,
-                    "selectWindow": (x) => `
-                        if (${x.target}.substring(4).toLowerCase() === 'open') {
-                        var newTab = await page.browser().newPage();
-                        await newTab.setViewport(page.viewport());
-                        await newTab.goto(${x.value}, { waitUntil: 'networkidle2' });
-                        await newTab.bringToFront();
-                        await browserTabs.push(newTab);
-                        page = newTab;
-                    } else if (
-                        ${x.target}.substring(4).toLowerCase() === 'closealltogether') {
-                        for (var i = 0; i < browserTabs.length; i++) {
-                            if (browserTabs[i] !== page) {
-                                await browserTabs[i].close();
-                            }
-                        }
-                        var newTabs = [page];
-                        browserTabs = [];
-                        browserTabs = newTabs;
-                    } else if (parseInt(${x.target}.substring(4)) >= 0) {
-                        var goto = parseInt(target.substring(4));
-                        await browserTabs[goto].bringToFront();
-                        page = browserTabs[goto];
-                        await page.waitFor(1000);
-                    }`,
-                    "pause": (x) => `await page.waitFor(parseInt(${x.target}));`,
-                    "mouseOver": (x) => `
-                        var path = await locatorToSelector(${x.target});
-                        var container = await getContainer(path);
-                        await container.hover(path);`,
-                    "deleteAllVisibleCookies": (x) => `for (var i = 0; i < browserTabs.length; i++) {
-                        await browserTabs[i]._client.send('Network.clearBrowserCookies');
-                    }`,
-                    "echo": (x) => `var path, container;
-                    if (value !== "#shownotification") {
-                        path = await locatorToSelector(${x.target});
-                        container = await getContainer(path);
-                    } else {
-                        container = page;
-                    }
-            
-                    if (container.evaluate('Notification.permission !== "granted"') && value === "#shownotification") {
-                        await container.evaluate('Notification.requestPermission()');
-                        await container.evaluate(t => {
-                            new Notification('Notification title', { body: t });
-                        }, ${x.target});
-                    } else if (value === "#shownotification") { //notification access already granted.
-                        await container.evaluate(t => {
-                            new Notification('Notification title', { body: t });
-                        }, ${x.target});
-                    }`,
-                    "assertAlert": (x) =>       `try {
-                                                    await assertionHelper(${x.target}, \`/alert\\(['"]([^'"]+)['"]\\)/\`);
-=======
                     selector = locatorToSelector(\`${x.target}\`);
                     container = await getContainer(selector);
                 try{
@@ -307,7 +218,6 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                                             }`,
                     "assertConfirmation": (x) => `try {
                                                     await assertionHelper(${x.target}, \`confirm\\(['"]([^'"]+)['"]\\)\`);
->>>>>>> 099008effa33153e8b5e94bcb833619e519a039c
                                                     console.log("Target: '" + ${x.target} + "' found.");
                                                 } catch (error) {
                                                     console.log("Confirmation message not found.");
