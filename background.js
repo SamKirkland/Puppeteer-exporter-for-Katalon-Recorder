@@ -102,7 +102,7 @@ let META = "\uE03D"; let COMMAND = META;
 */
 
 
-chrome.runtime.onMessageExternal.addListener(function(message, sender, sendResponse) {
+chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResponse) {
     if (message.type === 'katalon_recorder_export') {
         var payload = message.payload;
         var commands = payload.commands;
@@ -111,7 +111,7 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
         var mimetype = '';
         switch (payload.capabilityId) {
             case 'puppeteer':
-				debugger;
+                debugger;
                 let seleniumToPuppeteer = {
                     "open": (x) => `await page.goto('${x.target}');`,
                     "click": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.click(selector);`,
@@ -173,10 +173,82 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
                     }`,
 
                     "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);\n\tawait waitForPageEnter(\`${x.value}\`);`,
-                    "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};`
+                    "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};`,
+                    "verifyChecked": (x) =>     `var property;
 
+                                                try {
+                                                    var selector = locatorToSelector(${x.target});
+                                                    var container = await getContainer(selector);
+                                                    const elementHandle = await container.waitForSelector(selector);
+                                                    const jshandle = await elementHandle.getProperty('checked');
+                                                    property = await jshandle.jsonValue();
+                                                } catch (err) {
+                                                    return console.log("verifyChecked FAILED. Unable to retreive element or property. Error message:\n" + err);
+                                                }
+                                            
+                                                if (property) {
+                                                    console.log("verifyChecked PASSED. Element is checked.");
+                                                } else {
+                                                    console.log("verifyChecked FAILED. Element is unchecked.");
+                                                }`,
+                    "verifyElementPresent": (x) =>      `var selector = locatorToSelector(${x.target});
+
+                                                        if (await elementExists(selector)) {
+                                                            console.log("verifyElementPresent PASSED.");
+                                                        } else {
+                                                            console.log("verifyElementPresent FAILED. Element not found.");
+                                                        }`,
+                    "verifyText": (x) =>        `var property;
+
+                                                try {
+                                                    var selector = locatorToSelector(${x.target});
+                                                    var container = await getContainer(selector);
+                                                    const elementHandle = await container.waitForSelector(selector);
+                                                    const jshandle = await elementHandle.getProperty('text');
+                                                    property = await jshandle.jsonValue();
+                                                } catch (err) {
+                                                    return console.log("verifyText FAILED. Unable to retreive element or property. Error message:\n" + err);
+                                                }
+                                            
+                                                if (property === value) {
+                                                    console.log("verifyText PASSED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+                                                } else {
+                                                    console.log("verifyText FAILED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+                                                }`,
+                    "verifyTitle": (x) =>       `var title;
+
+                                                try {
+                                                    title = await page.title();
+                                                } catch (err) {
+                                                    return console.log("verifyTitle FAILED. Could not retreive title. Error message:\n" + err);
+                                                }
+                                            
+                                                if (title === value) {
+                                                    console.log("verifyTitle PASSED. Actual value = '" + title + "'. Given value = '" + value + "'.");
+                                                } else {
+                                                    console.log("verifyTitle FAILED. Actual value = '" + title + "'. Given value = '" + value + "'.");
+                                                }`,
+                    "verifyValue": (x) =>       `var property;
+                                            
+                                                try {
+                                                    var selector = locatorToSelector(${x.target});
+                                                    var container = await getContainer(selector);
+                                                    const elementHandle = await container.waitForSelector(selector);
+                                                    const jshandle = await elementHandle.getProperty('value');
+                                                    property = await jshandle.jsonValue();
+                                                } catch (err) {
+                                                    return console.log("verifyValue FAILED. Unable to retreive element or property. Error message:\n" + err);
+                                                }
+                                            
+                                                if (property === value) {
+                                                    console.log("verifyValue PASSED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+                                                } else {
+                                                    console.log("verifyValue FAILED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+                                                }`,
+                    "waitForPageToLoad": (x) => `while (await page.evaluate('document.readyState !== \'complete\';'));`,
+                    "waitForVisible": (x) =>    `var selector = locatorToSelector(${x.target}); var container = await getContainer(selector); return await container.waitForSelector(selector, { visible: true });`
                 }
-                
+
                 let convertedCommands = commands.map((c) => {
                     let equivCommand = seleniumToPuppeteer[c.command.toLowerCase()];
 
@@ -186,8 +258,8 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
                     return `alert('Command "${c.command.toLowerCase()}" not supported');`; //, ${c.target}', '${x.value}');`;
                 });
 
-content =
-`const puppeteer = require('puppeteer');
+                content =
+                    `const puppeteer = require('puppeteer');
 var xpath2css = require('xpath2css');
 
 // built in selenium vars
@@ -254,6 +326,29 @@ function locatorToSelector(target) {
     return selector;
 }
 
+async function elementExists(selector) {
+    try {
+        var elementhandle = await curpage.$(selector);
+
+        if (elementhandle) {
+            return true;
+        } else {
+            var frames = await curpage.frames();
+            var i, length = frames.length;
+            for (i = 0; i < length; i++) {
+                elementhandle = await frames[i].$(selector);
+
+                if (elementhandle) {
+                    return true;
+                }
+            }
+        }
+    } catch (err) {
+        return false;
+    }
+    return false;
+}
+
 (async () => {
 	let browser = await puppeteer.launch({headless: false, args:['--start-maximized']});
     var page = await browser.newPage();
@@ -292,17 +387,17 @@ function locatorToSelector(target) {
     
 })()`;
 
-			
+
                 extension = 'js';
                 mimetype = 'application/javascript';
                 break;
-				
+
             case 'json':
                 content = JSON.stringify(commands);
                 extension = 'json';
                 mimetype = 'application/ld-json';
                 break;
-				
+
             default:
                 content = 'Invalid capability ID';
                 extension = 'txt';
