@@ -121,31 +121,45 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                             await container.waitForSelector(selector);
                             await delay (250);
                             await container.click(selector);
-                        }catch() {
+                        }catch(error) {
+                            console.log(error);
                             container.mouse.down();
-                        }\n`,
-                    "echo": (x) => `console.log('${x.target}');\n`,
-                    "store": (x) => `let ${x.target} = ${x.value};\n`,
-                    "type": (x) => `selector = locatorToSelector(\`${x.target}\`);
+                        }`,
+                    "echo": (x) => `console.log('${x.target}');`,
+                    "store": (x) => `let ${x.target} = ${x.value};`,
+                    "type": (x) => `
+                        selector = locatorToSelector(\`${x.target}\`);
                         container = await getContainer(selector);
-                        await container.type(selector, \`${x.value}\`);\n`,
-                    "get": (x) => `await page.goto('${x.target}');\n`,
-                    "comment": (x) => `// ${x.target}\n`,
-                    "sendkeys": (x) => `await page.keyboard.sendCharacter(\`${x.value}\`);
-                        await waitForPageEnter(\`${x.value}\`);\n`,
-                    "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};\n`,
-                    "captureScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.goto(page.url());\nawait page.screenshot({ path: name });\n`,
-                    "captureEntirePageScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.screenshot({ path: name, fullPage: true });\n`,
-                    "bringBrowserToForeground": (x) => `await page.bringToFront();\n`,
+                        await container.type(selector, \`${x.value}\`);`,
+                    "get": (x) => `await page.goto('${x.target}');`,
+                    "comment": (x) => `// ${x.target}`,
+                    "sendkeys": (x) => `
+                        await page.keyboard.press(keyDictionary[\`${x.value}\`]);
+                        //await waitForPageEnter(\`${x.value}\`);`,
+                    "selectframe": (x) => `
+                        if(\`${x.target}\` === 'relative=parent') {
+                            page = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {
+                            page=page.frames()[parseInt('${x.target}'.substring(6))];
+                        };`,
+                    "captureScreenshot": (x) => `
+                        let name = ${x.target} + ".jpg";
+                        await page.goto(page.url());
+                        await page.screenshot({ path: name });`,
+                    "captureEntirePageScreenshot": (x) => `
+                        let name = ${x.target} + ".jpg";
+                        await page.screenshot({ path: name, fullPage: true });`,
+                    "bringBrowserToForeground": (x) => `await page.bringToFront();`,
                     "refresh": (x) => `await page.reload();`,
-                    "selectWindow": (x) => `if (${x.target}.substring(4).toLowerCase() === 'open') {\n
+                    "selectWindow": (x) => `
+                        if (${x.target}.substring(4).toLowerCase() === 'open') {
                         var newTab = await page.browser().newPage();
                         await newTab.setViewport(page.viewport());
                         await newTab.goto(${x.value}, { waitUntil: 'networkidle2' });
                         await newTab.bringToFront();
                         await browserTabs.push(newTab);
                         page = newTab;
-                    } else if (${x.target}.substring(4).toLowerCase() === 'closealltogether') {
+                    } else if (
+                        ${x.target}.substring(4).toLowerCase() === 'closealltogether') {
                         for (var i = 0; i < browserTabs.length; i++) {
                             if (browserTabs[i] !== page) {
                                 await browserTabs[i].close();
@@ -159,12 +173,15 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                         await browserTabs[goto].bringToFront();
                         page = browserTabs[goto];
                         await page.waitFor(1000);
-                    }\n`,
-                    "pause": (x) => `await page.waitFor(parseInt(${x.target}));\n`,
-                    "mouseOver": (x) => `var path = await locatorToSelector(${x.target});\nvar container = await getContainer(path);\nawait container.hover(path);\n`,
+                    }`,
+                    "pause": (x) => `await page.waitFor(parseInt(${x.target}));`,
+                    "mouseOver": (x) => `
+                        var path = await locatorToSelector(${x.target});
+                        var container = await getContainer(path);
+                        await container.hover(path);`,
                     "deleteAllVisibleCookies": (x) => `for (var i = 0; i < browserTabs.length; i++) {
                         await browserTabs[i]._client.send('Network.clearBrowserCookies');
-                    }\n`,
+                    }`,
                     "echo": (x) => `var path, container;
                     if (value !== "#shownotification") {
                         path = await locatorToSelector(${x.target});
@@ -182,7 +199,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                         await container.evaluate(t => {
                             new Notification('Notification title', { body: t });
                         }, ${x.target});
-                    }\n`,
+                    }`,
                     "assertAlert": (x) =>       `try {
                                                     await assertionHelper(${x.target}, \`/alert\\(['"]([^'"]+)['"]\\)/\`);
                                                     console.log("Target: '" + ${x.target} + "' found.");
@@ -362,7 +379,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     if (typeof equivCommand === "function") {
                         return equivCommand(c);
                     }
-                    return `alert('Command "${c.command.toLowerCase()}" not supported');`; //, ${c.target}', '${x.value}');`;
+                    //return `alert('Command "${c.command.toLowerCase()}" not supported');`; //, ${c.target}', '${x.value}');`;
                 });
 
 content =
@@ -469,7 +486,7 @@ var keyDictionary = {
     '$(KEY_BACKSPACE)': 'Backspace',
     '$(KEY_DEL)': 'Delete',
     '$(KEY_DELETE)': 'Delete',
-    '\${KEY_ENTER}\': 'Enter',
+    '$(KEY_ENTER)': 'Enter',
     '$(KEY_TAB)': 'Tab',
     '$(KEY_HOME)': 'Home'
 };
@@ -481,7 +498,7 @@ async function assertionHelper(target, regex) {
         for (var i = 0; i < elem.length; i++) {
             var txt = elem[i].textContent.match(reg);
             if (txt) {
-                var checkText = txt[1].replace('\\n', '\n');
+                var checkText = txt[1].replace('\\\\n', '\\n');
                 if (checkText === t) {
                     break;
                 }
