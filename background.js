@@ -116,7 +116,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "open": (x) => `await page.goto('${x.target}');`,
                     "click": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait delay (250);\n\tawait page.click(selector);`,
                     "echo": (x) => `console.log('${x.target}');`,
-                    "store": (x) => `let ${x.target} = ${x.value};`,
+                    "store": (x) => `let ${x.value} = ${x.target};`,
                     
                     "type": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.type(selector, \`${x.value}\`);`,
                     "get": (x) => `await page.goto('${x.target}');`,
@@ -426,7 +426,7 @@ function locatorToSelector(target) {
 
 async function elementExists(selector) {
     try {
-        var elementhandle = await curpage.$(selector);
+        var elementhandle = await page.$(selector);
 
         if (elementhandle) {
             return true;
