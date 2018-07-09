@@ -113,19 +113,30 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
             case 'puppeteer':
                 debugger;
                 let seleniumToPuppeteer = {
-                    "open": (x) => `await page.goto('${x.target}');`,
-                    "click": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait delay (250);\n\tawait page.click(selector);`,
-                    "echo": (x) => `console.log('${x.target}');`,
-                    "store": (x) => `let ${x.target} = ${x.value};`,
-                    
-                    "type": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.type(selector, \`${x.value}\`);`,
-                    "get": (x) => `await page.goto('${x.target}');`,
-                    "comment": (x) => `// ${x.target}`,
-                    "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);\n\tawait waitForPageEnter(\`${x.value}\`);`,
-                    "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};`,
-                    "captureScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.goto(page.url());\nawait page.screenshot({ path: name });`,
-                    "captureEntirePageScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.screenshot({ path: name, fullPage: true }); `,
-                    "bringBrowserToForeground": (x) => `await page.bringToFront();`,
+                    "open": (x) => `await page.goto('${x.target}');\n`,
+                    "click": (x) => `
+                            selector = locatorToSelector(\`${x.target}\`);
+                            container = await getContainer(selector);
+                        try{
+                            await container.waitForSelector(selector);
+                            await delay (250);
+                            await container.click(selector);
+                        }catch() {
+                            container.mouse.down();
+                        }\n`,
+                    "echo": (x) => `console.log('${x.target}');\n`,
+                    "store": (x) => `let ${x.target} = ${x.value};\n`,
+                    "type": (x) => `selector = locatorToSelector(\`${x.target}\`);
+                        container = await getContainer(selector);
+                        await container.type(selector, \`${x.value}\`);\n`,
+                    "get": (x) => `await page.goto('${x.target}');\n`,
+                    "comment": (x) => `// ${x.target}\n`,
+                    "sendkeys": (x) => `await page.keyboard.sendCharacter(\`${x.value}\`);
+                        await waitForPageEnter(\`${x.value}\`);\n`,
+                    "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};\n`,
+                    "captureScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.goto(page.url());\nawait page.screenshot({ path: name });\n`,
+                    "captureEntirePageScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.screenshot({ path: name, fullPage: true });\n`,
+                    "bringBrowserToForeground": (x) => `await page.bringToFront();\n`,
                     "refresh": (x) => `await page.reload();`,
                     "selectWindow": (x) => `if (${x.target}.substring(4).toLowerCase() === 'open') {\n
                         var newTab = await page.browser().newPage();
@@ -148,12 +159,12 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                         await browserTabs[goto].bringToFront();
                         page = browserTabs[goto];
                         await page.waitFor(1000);
-                    }`,
-                    "pause": (x) => `await page.waitFor(parseInt(${x.target}));`,
-                    "mouseOver": (x) => `var path = await locatorToSelector(${x.target});\nvar container = await getContainer(path);\nawait container.hover(path);`,
+                    }\n`,
+                    "pause": (x) => `await page.waitFor(parseInt(${x.target}));\n`,
+                    "mouseOver": (x) => `var path = await locatorToSelector(${x.target});\nvar container = await getContainer(path);\nawait container.hover(path);\n`,
                     "deleteAllVisibleCookies": (x) => `for (var i = 0; i < browserTabs.length; i++) {
                         await browserTabs[i]._client.send('Network.clearBrowserCookies');
-                    }`,
+                    }\n`,
                     "echo": (x) => `var path, container;
                     if (value !== "#shownotification") {
                         path = await locatorToSelector(${x.target});
@@ -171,7 +182,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                         await container.evaluate(t => {
                             new Notification('Notification title', { body: t });
                         }, ${x.target});
-                    }`,
+                    }\n`,
                     "verifyChecked": (x) =>     `var property;
 
                                                 try {
@@ -259,6 +270,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
 content =
 `const puppeteer = require('puppeteer');
 const xpath2css = require('xpath2css');
+const delay = require('delay');
 // built in selenium vars
 // https://github.com/Jongkeun/selenium-ide/blob/6d18a36991a9541ab3e9cad50c2023b0680e497b/packages/selenium-ide/src/content/selenium-api.js
 let KEY_BACKSPACE = "\\uE003"; let KEY_BKSP = KEY_BACKSPACE;
@@ -345,11 +357,30 @@ async function elementExists(selector) {
     }
     return false;
 }
-
+var page;
+var keyDictionary = {
+    '$(KEY_LEFT)': 'ArrowLeft',
+    '$(KEY_UP)': 'ArrowUp',
+    '$(KEY_RIGHT)': 'ArrowRight',
+    '$(KEY_DOWN)': 'ArrowDown',
+    '$(KEY_PGUP)': 'PageUp',
+    '$(KEY_PAGE_UP)': 'PageUp',
+    '$(KEY_PGDN)': 'PageDown',
+    '$(KEY_PAGE_DOWN)': 'PageDown',
+    '$(KEY_BKSP)': 'Backspace',
+    '$(KEY_BACKSPACE)': 'Backspace',
+    '$(KEY_DEL)': 'Delete',
+    '$(KEY_DELETE)': 'Delete',
+    '\${KEY_ENTER}\': 'Enter',
+    '$(KEY_TAB)': 'Tab',
+    '$(KEY_HOME)': 'Home'
+};
 (async () => {
 	let browser = await puppeteer.launch({headless: false, args:['--start-maximized']});
-    var page = await browser.newPage();
+    var initPage = await browser.newPage();
+    page = initPage;
     var selector = null;
+    var container = null;
     await page._client.send('Emulation.clearDeviceMetricsOverride');
     var winWidth = await page.evaluate(
         () => {
