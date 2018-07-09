@@ -127,9 +127,13 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                             selector = locatorToSelector(\`${x.target}\`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(\`${x.target}\`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
                             console.log(error);
                             container.mouse.down();
@@ -403,7 +407,20 @@ async function getContainer(selector) {
         }
     }
 }
+function getLink(target) {
+    var find = 'a href="*+target';
+    var source = await page.content();
+    var regex, link, matches = [];
+  
+    
+    var find = tVal.split('*');
+    var toReg = "\\" + find[0] + "(.*?)" + "\\" + find[1];
+    regex = new RegExp(toReg, 'gi');
+    matches = source.match(regex);
+    link = matches[0].match(/"([^"]+)"/)[1];
 
+    return link;
+}
 function locatorToSelector(target) {
     var selector;
 
@@ -422,6 +439,7 @@ function locatorToSelector(target) {
         selector = "[name=" + target.substring(5, target.length) + "]";
     } else if (target.substring(0, 5) === "link=") {
         selector = "[link=" + target.substring(5, target.length) + "]";
+        selector = getLink(target);
         //Probably does not work, if meant to be used for ref attributes
     } else if (target.substring(0, 11) === "identifier=") {
         selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
@@ -462,21 +480,21 @@ async function elementExists(selector) {
 }
 var page;
 var keyDictionary = {
-    '$(KEY_LEFT)': 'ArrowLeft',
-    '$(KEY_UP)': 'ArrowUp',
-    '$(KEY_RIGHT)': 'ArrowRight',
-    '$(KEY_DOWN)': 'ArrowDown',
-    '$(KEY_PGUP)': 'PageUp',
-    '$(KEY_PAGE_UP)': 'PageUp',
-    '$(KEY_PGDN)': 'PageDown',
-    '$(KEY_PAGE_DOWN)': 'PageDown',
-    '$(KEY_BKSP)': 'Backspace',
-    '$(KEY_BACKSPACE)': 'Backspace',
-    '$(KEY_DEL)': 'Delete',
-    '$(KEY_DELETE)': 'Delete',
-    '$(KEY_ENTER)': 'Enter',
-    '$(KEY_TAB)': 'Tab',
-    '$(KEY_HOME)': 'Home'
+    '\${KEY_LEFT}': 'ArrowLeft',
+    '\${KEY_UP}': 'ArrowUp',
+    '\${KEY_RIGHT}': 'ArrowRight',
+    '\${KEY_DOWN}': 'ArrowDown',
+    '\${KEY_PGUP}': 'PageUp',
+    '\${KEY_PAGE_UP}': 'PageUp',
+    '\${KEY_PGDN}': 'PageDown',
+    '\${KEY_PAGE_DOWN}': 'PageDown',
+    '\${KEY_BKSP}': 'Backspace',
+    '\${KEY_BACKSPACE}': 'Backspace',
+    '\${KEY_DEL}': 'Delete',
+    '\${KEY_DELETE}': 'Delete',
+    '\${KEY_ENTER}': 'Enter',
+    '\${KEY_TAB}': 'Tab',
+    '\${KEY_HOME}': 'Home'
 };
 
 async function assertionHelper(target, regex) {
@@ -523,16 +541,6 @@ async function assertionHelper(target, regex) {
 
     // exported test
     ${convertedCommands.join('\n\t')}
-
-    // helper function for enter button to wait
-    async function waitForPageEnter(value) {
-		console.log(value);
-		if(value === \`\${KEY_ENTER}\`) {
-			await console.log("ya we waitin");
-			await page.waitForNavigation({ timeout: 4500 });
-		}
-
-    }
 
     await browser.close();
     
