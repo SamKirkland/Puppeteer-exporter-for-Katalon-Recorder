@@ -114,14 +114,14 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                 debugger;
                 let seleniumToPuppeteer = {
                     "open": (x) => `await page.goto('${x.target}');`,
-                    "click": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.click(selector);`,
+                    "click": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait delay (250);\n\tawait page.click(selector);`,
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
                     "type": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.type(selector, \`${x.value}\`);`,
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
                     "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);`,
-                    "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};`,
+                    "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tvar index = parseInt('${x.target}'.substring(6));\n\t\tpage=page.frames()[index];\n\t};`,
                     "captureScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.goto(page.url());\nawait page.screenshot({ path: name });`,
                     "captureEntirePageScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.screenshot({ path: name, fullPage: true }); `,
                     "bringBrowserToForeground": (x) => `await page.bringToFront();`,
@@ -261,6 +261,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                 content =
                     `const puppeteer = require('puppeteer');
 var xpath2css = require('xpath2css');
+const delay = require('delay');
 
 // built in selenium vars
 // https://github.com/Jongkeun/selenium-ide/blob/6d18a36991a9541ab3e9cad50c2023b0680e497b/packages/selenium-ide/src/content/selenium-api.js
