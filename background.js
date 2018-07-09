@@ -140,8 +140,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                 await container.type(selector, \`${x.value}\`);\n`,
                     "get": (x) => `await page.goto('${x.target}');\n`,
                     "comment": (x) => `// ${x.target}\n`,
-                    "sendkeys": (x) => `await page.keyboard.sendCharacter(\`${x.value}\`);
-                await waitForPageEnter(\`${x.value}\`);\n`,
+                    "sendkeys": (x) => `await page.keyboard.sendCharacter(\`${x.value}\`);\n`,
                     "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};\n`,
                     "captureScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.goto(page.url());\nawait page.screenshot({ path: name });\n`,
                     "captureEntirePageScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.screenshot({ path: name, fullPage: true });\n`,
@@ -531,16 +530,6 @@ async function assertionHelper(target, regex) {
 
     // exported test
     ${convertedCommands.join('\n\t')}
-
-    // helper function for enter button to wait
-    async function waitForPageEnter(value) {
-		console.log(value);
-		if(value === \`\${KEY_ENTER}\`) {
-			await console.log("ya we waitin");
-			await page.waitForNavigation({ timeout: 4500 });
-		}
-
-    }
 
     await browser.close();
     
