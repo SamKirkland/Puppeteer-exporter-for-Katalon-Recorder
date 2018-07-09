@@ -117,10 +117,12 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
                     "click": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.click(selector);`,
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
-                    "type": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tvar container = await getContainer(\`${x.target}\`, page);\t\nawait container.type(selector, \`${x.value}\`);`,
+                    
+                    "type": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.type(selector, \`${x.value}\`);`,
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
-                    "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);`,
+                    //"sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);`,
+                    "sendkeys": (x) => `selector = locatorToSelector(\`${x.target}\`);\n\tawait page.waitForSelector(selector);\n\tawait page.keyboard.sendCharacter(\`${x.value}\`);\n\tawait waitForPageEnter(\`${x.value}\`);`,
                     "selectframe": (x) => `if(\`${x.target}\` === 'relative=parent') {\n\t\tpage = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {\n\t\tpage=page.frames()[parseInt('${x.target}'.substring(6))];\n\t};`,
                     "captureScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.goto(page.url());\nawait page.screenshot({ path: name });`,
                     "captureEntirePageScreenshot": (x) => `let name = ${x.target} + ".jpg";\nawait page.screenshot({ path: name, fullPage: true }); `,
@@ -171,6 +173,9 @@ chrome.runtime.onMessageExternal.addListener(function(message, sender, sendRespo
                             new Notification('Notification title', { body: t });
                         }, ${x.target});
                     }`
+                    
+                   
+                  
                 }
                 
                 let convertedCommands = commands.map((c) => {
@@ -252,7 +257,7 @@ function locatorToSelector(target) {
 (async () => {
 	let browser = await puppeteer.launch({headless: false, args:['--start-maximized']});
     var page = await browser.newPage();
-
+    var selector = null;
     await page._client.send('Emulation.clearDeviceMetricsOverride');
     var winWidth = await page.evaluate(
         () => {
@@ -273,7 +278,18 @@ function locatorToSelector(target) {
     // exported test
     ${convertedCommands.join('\n\t')}
 
-    await browser.close()
+    // helper function for enter button to wait
+    async function waitForPageEnter(value) {
+		console.log(value);
+		if(value === \`\${KEY_ENTER}\`) {
+			await console.log("ya we waitin");
+			await page.waitForNavigation({ timeout: 4500 });
+		}
+
+    }
+
+    await browser.close();
+    
 })()`;
 
 			
