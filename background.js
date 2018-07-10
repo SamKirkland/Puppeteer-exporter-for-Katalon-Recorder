@@ -124,20 +124,31 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                 seleniumToPuppeteer = {
                     "open": (x) => `await page.goto('${x.target}');\n`,
                     "click": (x) => `
-                            selector = locatorToSelector(\`${x.target}\`);
+                            selector = await locatorToSelector(\`${x.target}\`);
                             container = await getContainer(selector);
-                        try{
-                            if(\`${x.target}\`.substring(0, 5) === "link=" ){
-                                await page.goto(selector);
-                            } else {
-                                await container.waitForSelector(selector);
-                                await delay (250);
-                                await container.click(selector);
-                            }   
-                        }catch(error) {
-                            console.log(error);
-                            container.mouse.down();
-                        }`,
+                            await container.addScriptTag({ url: 'https://code.jquery.com/jquery-3.2.1.min.js' });
+                            try {
+                                await container.waitFor(500);
+                                await container.waitForSelector(selector, { timeout: 5000, visible: true });
+                        
+                                var isALink = await container.evaluate((s) => {
+                                    var element = document.querySelector(s);
+                                    var tag = element.tagName.toLowerCase();
+                                    var href = element.href;
+                                    return (href !== undefined && href !== "" && tag === 'a');
+                                }, selector);
+                        
+                                if (isALink) {
+                                    const navigationPromise = page.waitForNavigation();
+                                    await container.click(selector);
+                                    await navigationPromise;
+                                } else {
+                                    await container.click(selector);
+                                }
+                            } catch (error) {
+                                console.log(error);
+                                await page.mouse.down();
+                            }`,
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
                     "type": (x) => `
@@ -386,6 +397,7 @@ let KEY_ENTER = "\\uE007";
 let KEY_SHIFT = "\\uE008";
 let KEY_ESC = "\\uE00C"; let KEY_ESCAPE = KEY_ESC;
 let KEY_DELETE = "\\uE017"; let KEY_DEL = KEY_DELETE;
+var page;
 
 async function getContainer(selector) {
     //returns previous index if not found
@@ -421,7 +433,7 @@ function getLink(target) {
 
     return link;
 }
-function locatorToSelector(target) {
+async function locatorToSelector(target) {
     var selector;
 
     if (target.substring(0, 1) === "/" || target.substring(0, 6) === "xpath=") {
@@ -438,9 +450,8 @@ function locatorToSelector(target) {
     } else if (target.substring(0, 5) === "name=") {
         selector = "[name=" + target.substring(5, target.length) + "]";
     } else if (target.substring(0, 5) === "link=") {
-        selector = "[link=" + target.substring(5, target.length) + "]";
-        selector = getLink(target);
-        //Probably does not work, if meant to be used for ref attributes
+        selector = "//a[contains(text(),'" + target.substring(5, target.length) + "')]";
+        selector = xpath2css(selector);
     } else if (target.substring(0, 11) === "identifier=") {
         selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
     } else if (target.substring(0, 4) === "dom=") {
@@ -452,7 +463,37 @@ function locatorToSelector(target) {
     } else {
         selector = target;
     }
+    //console.log(page);
+    selector = await page.evaluate((s) => {
+        console.log('test');
+        jQuery.fn.extend({
+            getPath: function () {
+                var path, node = this;
+                while (node.length) {
+                    var realNode = node[0], name = realNode.localName;
+                    if (!name) break;
+                    name = name.toLowerCase();
 
+                    var parent = node.parent();
+                    var sameTagSiblings = parent.children(name);
+                    if (sameTagSiblings.length > 1) {
+                        allSiblings = parent.children();
+                        var index = allSiblings.index(realNode) + 1;
+                        if (index > 1) {
+                            name += ':nth-child(' + index + ')';
+                        }
+                    }
+
+                    path = name + (path ? '>' + path : '');
+                    node = parent;
+                }
+                return path;
+            }
+        });
+        var element = $(s);
+        return (element.getPath());
+
+    }, selector);
     return selector;
 }
 
@@ -478,7 +519,7 @@ async function elementExists(selector) {
     }
     return false;
 }
-var page;
+
 var keyDictionary = {
     '\${KEY_LEFT}': 'ArrowLeft',
     '\${KEY_UP}': 'ArrowUp',
@@ -498,7 +539,7 @@ var keyDictionary = {
 };
 
 async function assertionHelper(target, regex) {
-    await curpage.evaluate((t, r) => {
+    await page.evaluate((t, r) => {
         var elem = document.scripts;
         var reg = new RegExp(r);
         for (var i = 0; i < elem.length; i++) {
@@ -523,6 +564,7 @@ async function assertionHelper(target, regex) {
     var selector = null;
     var container = null;
     await page._client.send('Emulation.clearDeviceMetricsOverride');
+
     var winWidth = await page.evaluate(
         () => {
             return window.innerWidth;
