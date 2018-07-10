@@ -122,7 +122,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                 debugger;
             case 'puppeteerShared':
                 seleniumToPuppeteer = {
-                    "open": (x) => `await page.goto('${x.target}');\n`,
+                    "open": (x) => `\t\t\t\t\tawait page.goto('${x.target}');\n`,
                     "click": (x) => `
                             
                         selector = await locatorToSelector(\`${x.target}\`);
