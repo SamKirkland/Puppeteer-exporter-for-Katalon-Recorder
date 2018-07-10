@@ -128,7 +128,6 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                         selector = await locatorToSelector(\`${x.target}\`);
                         container = await getContainer(selector);
                         try{
-                                    
                             await container.waitForSelector(selector);
                             await delay (250);
                             await container.click(selector);
@@ -142,7 +141,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
                     "type": (x) => `
-                        selector = locatorToSelector(\`${x.target}\`);
+                        selector = await locatorToSelector(\`${x.target}\`);
                         container = await getContainer(selector);
                         await container.type(selector, \`${x.value}\`);`,
                     "get": (x) => `await page.goto('${x.target}');`,
@@ -224,7 +223,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "assertText": (x) => `var property;
 
                                         try {
-                                            var selector = locatorToSelector(${x.target});
+                                            var selector = await locatorToSelector(${x.target});
                                             var container = await getContainer(selector);
                                             const elementHandle = await container.waitForSelector(selector);
                                             const jshandle = await elementHandle.getProperty('text');
@@ -255,7 +254,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                                             throw "assertTitle FAILED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.";
                                             process.exit();
                                         }`,
-                    "assertElementPresent": (x) => `var selector = locatorToSelector(${x.target});
+                    "assertElementPresent": (x) => `var selector = await locatorToSelector(${x.target});
 
                                                 if (await elementExists(selector)) {
                                                     console.log("assertElementPresent PASSED.");
@@ -272,7 +271,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "assertValue": (x) => `var property;
 
                                         try {
-                                            var selector = locatorToSelector(${x.target});
+                                            var selector = await locatorToSelector(${x.target});
                                             var container = await getContainer(selector);
                                             const elementHandle = await container.waitForSelector(selector);
                                             const jshandle = await elementHandle.getProperty('value');
@@ -291,7 +290,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "verifyChecked": (x) => `var property;
 
                                         try {
-                                            var selector = locatorToSelector(${x.target});
+                                            var selector = await locatorToSelector(${x.target});
                                             var container = await getContainer(selector);
                                             const elementHandle = await container.waitForSelector(selector);
                                             const jshandle = await elementHandle.getProperty('checked');
@@ -305,7 +304,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                                         } else {
                                             console.log("verifyChecked FAILED. Element is unchecked.");
                                         }`,
-                    "verifyElementPresent": (x) => `var selector = locatorToSelector(${x.target});
+                    "verifyElementPresent": (x) => `var selector = await locatorToSelector(${x.target});
 
                                                 if (await elementExists(selector)) {
                                                     console.log("verifyElementPresent PASSED.");
@@ -315,7 +314,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "verifyText": (x) => `var property;
 
                                         try {
-                                            var selector = locatorToSelector(${x.target});
+                                            var selector = await locatorToSelector(${x.target});
                                             var container = await getContainer(selector);
                                             const elementHandle = await container.waitForSelector(selector);
                                             const jshandle = await elementHandle.getProperty('text');
@@ -345,7 +344,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "verifyValue": (x) => `var property;
                                     
                                         try {
-                                            var selector = locatorToSelector(${x.target});
+                                            var selector = await locatorToSelector(${x.target});
                                             var container = await getContainer(selector);
                                             const elementHandle = await container.waitForSelector(selector);
                                             const jshandle = await elementHandle.getProperty('value');
@@ -360,7 +359,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                                             console.log("verifyValue FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
                                         }`,
                     "waitForPageToLoad": (x) => `while (await page.evaluate('document.readyState !== \'complete\';'));`,
-                    "waitForVisible": (x) => `var selector = locatorToSelector(${x.target}); var container = await getContainer(selector); return await container.waitForSelector(selector, { visible: true });`
+                    "waitForVisible": (x) => `var selector = await locatorToSelector(${x.target}); var container = await getContainer(selector); return await container.waitForSelector(selector, { visible: true });`
                 }
 
                 if(payload.capabilityId === 'puppeteerBT') {
@@ -538,46 +537,7 @@ async function assertionHelper(target, regex) {
         }
     }, target, regex);
 }
-function getRegexMatches(tVal, source) {
-    var regex;
-    if (tVal.substring(0, 6) === 'regex=') {
-        regex = new RegExp(tVal.substring(6), 'gi');
-    } else {
-        var find = tVal.split('*');
-        var toReg = "\\\\" + find[0] + "(.*?)" + "\\\\" + find[1];
-        regex = new RegExp(toReg, 'gi');
-    }
-    return source.match(regex);
-}
-sourceExtract_ = async function sourceExtract_(target) {
-    try {
-        var source = await page.content();
-        var matches = [];
-        var tVal = target, locator = -1;
-        var tArr = target.split('@');
-        if (tArr.length > 1 && typeof (parseInt(tArr[tArr.length - 1])) === typeof (1)) {
-            tVal = '';
-            locator = parseInt(tArr[tArr.length - 1]);
-            for (var i = 0; i < tArr.length - 1; i++) {
-                tVal += tArr[i];
-            }
-        }
-        matches = getRegexMatches(tVal, source);
-        if (matches === null || matches.length === 0) {
-            console.log('#nomatchfound');
-        } else if (locator < 0) {
-            console.log(matches);
-        }
-        else {
-            console.log(matches[locator - 1]);
-        }
-        return matches;
-    } catch (error) {
-        console.log(error);
-    }
 
-
-};
 (async () => {
 	let browser = await puppeteer.launch({headless: false, args:['--start-maximized']});
     var initPage = await browser.newPage();
