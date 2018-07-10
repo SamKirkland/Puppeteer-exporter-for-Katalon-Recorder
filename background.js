@@ -122,7 +122,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                 debugger;
             case 'puppeteerShared':
                 seleniumToPuppeteer = {
-                    "open": (x) => `await page.goto('${x.target}');\n`,
+                    "open": (x) => `\t\t\t\t\tawait page.goto('${x.target}');\n`,
                     "click": (x) => `
                             selector = await locatorToSelector(\`${x.target}\`);
                             container = await getContainer(selector);
@@ -152,12 +152,13 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
                     "type": (x) => `
-                        selector = locatorToSelector(\`${x.target}\`);
+                        selector = await locatorToSelector(\`${x.target}\`);
                         container = await getContainer(selector);
                         await container.type(selector, \`${x.value}\`);`,
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
                     "sendkeys": (x) => `
+                        await delay(500);
                         await page.keyboard.press(keyDictionary[\`\\${x.value}\`]);
                         //await waitForPageEnter(\`${x.value}\`);`,
                     "selectframe": (x) => `
@@ -233,7 +234,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "assertText": (x) => `var property;
 
                                         try {
-                                            var selector = locatorToSelector(${x.target});
+                                            var selector = await locatorToSelector(${x.target});
                                             var container = await getContainer(selector);
                                             const elementHandle = await container.waitForSelector(selector);
                                             const jshandle = await elementHandle.getProperty('text');
@@ -264,7 +265,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                                             throw "assertTitle FAILED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.";
                                             process.exit();
                                         }`,
-                    "assertElementPresent": (x) => `var selector = locatorToSelector(${x.target});
+                    "assertElementPresent": (x) => `var selector = await locatorToSelector(${x.target});
 
                                                 if (await elementExists(selector)) {
                                                     console.log("assertElementPresent PASSED.");
@@ -281,7 +282,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "assertValue": (x) => `var property;
 
                                         try {
-                                            var selector = locatorToSelector(${x.target});
+                                            var selector = await locatorToSelector(${x.target});
                                             var container = await getContainer(selector);
                                             const elementHandle = await container.waitForSelector(selector);
                                             const jshandle = await elementHandle.getProperty('value');
@@ -300,7 +301,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "verifyChecked": (x) => `var property;
 
                                         try {
-                                            var selector = locatorToSelector(${x.target});
+                                            var selector = await locatorToSelector(${x.target});
                                             var container = await getContainer(selector);
                                             const elementHandle = await container.waitForSelector(selector);
                                             const jshandle = await elementHandle.getProperty('checked');
@@ -314,7 +315,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                                         } else {
                                             console.log("verifyChecked FAILED. Element is unchecked.");
                                         }`,
-                    "verifyElementPresent": (x) => `var selector = locatorToSelector(${x.target});
+                    "verifyElementPresent": (x) => `var selector = await locatorToSelector(${x.target});
 
                                                 if (await elementExists(selector)) {
                                                     console.log("verifyElementPresent PASSED.");
@@ -324,7 +325,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "verifyText": (x) => `var property;
 
                                         try {
-                                            var selector = locatorToSelector(${x.target});
+                                            var selector = await locatorToSelector(${x.target});
                                             var container = await getContainer(selector);
                                             const elementHandle = await container.waitForSelector(selector);
                                             const jshandle = await elementHandle.getProperty('text');
@@ -354,7 +355,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "verifyValue": (x) => `var property;
                                     
                                         try {
-                                            var selector = locatorToSelector(${x.target});
+                                            var selector = await locatorToSelector(${x.target});
                                             var container = await getContainer(selector);
                                             const elementHandle = await container.waitForSelector(selector);
                                             const jshandle = await elementHandle.getProperty('value');
@@ -369,7 +370,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                                             console.log("verifyValue FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
                                         }`,
                     "waitForPageToLoad": (x) => `while (await page.evaluate('document.readyState !== \'complete\';'));`,
-                    "waitForVisible": (x) => `var selector = locatorToSelector(${x.target}); var container = await getContainer(selector); return await container.waitForSelector(selector, { visible: true });`
+                    "waitForVisible": (x) => `var selector = await locatorToSelector(${x.target}); var container = await getContainer(selector); return await container.waitForSelector(selector, { visible: true });`
                 }
 
                 if(payload.capabilityId === 'puppeteerBT') {
@@ -419,23 +420,10 @@ async function getContainer(selector) {
         }
     }
 }
-function getLink(target) {
-    var find = 'a href="*+target';
-    var source = await page.content();
-    var regex, link, matches = [];
-  
-    
-    var find = tVal.split('*');
-    var toReg = "\\" + find[0] + "(.*?)" + "\\" + find[1];
-    regex = new RegExp(toReg, 'gi');
-    matches = source.match(regex);
-    link = matches[0].match(/"([^"]+)"/)[1];
 
-    return link;
-}
 async function locatorToSelector(target) {
     var selector;
-
+    await page.addScriptTag({ url: 'https://code.jquery.com/jquery-3.2.1.min.js' });
     if (target.substring(0, 1) === "/" || target.substring(0, 6) === "xpath=") {
         if (target.indexOf('@') != target.lastIndexOf('@')) {
             var attributeSelector = target.substring(target.lastIndexOf('@'), target.length);
@@ -448,7 +436,8 @@ async function locatorToSelector(target) {
     } else if (target.substring(0, 3) === "id=") {
         selector = "[id=" + target.substring(3, target.length) + "]";
     } else if (target.substring(0, 5) === "name=") {
-        selector = "[name=" + target.substring(5, target.length) + "]";
+        selector = "//input[@name="+target.substring(5, target.length) + "]";
+        selector = xpath2css(selector);
     } else if (target.substring(0, 5) === "link=") {
         selector = "//a[contains(text(),'" + target.substring(5, target.length) + "')]";
         selector = xpath2css(selector);
