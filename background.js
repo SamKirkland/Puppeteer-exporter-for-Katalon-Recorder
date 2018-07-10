@@ -124,20 +124,21 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                 seleniumToPuppeteer = {
                     "open": (x) => `await page.goto('${x.target}');\n`,
                     "click": (x) => `
-                            selector = locatorToSelector(\`${x.target}\`);
-                            container = await getContainer(selector);
+                            
+                        selector = await locatorToSelector(\`${x.target}\`);
+                        container = await getContainer(selector);
                         try{
-                            if(\`${x.target}\`.substring(0, 5) === "link=" ){
-                                await page.goto(selector);
-                            } else {
-                                await container.waitForSelector(selector);
-                                await delay (250);
-                                await container.click(selector);
-                            }   
+                                    
+                            await container.waitForSelector(selector);
+                            await delay (250);
+                            await container.click(selector);
+                                
                         }catch(error) {
                             console.log(error);
                             container.mouse.down();
-                        }`,
+                        }
+                            
+                        `,
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
                     "type": (x) => `
@@ -147,6 +148,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
                     "sendkeys": (x) => `
+                        await delay(1000);
                         await page.keyboard.press(keyDictionary[\`\\${x.value}\`]);
                         //await waitForPageEnter(\`${x.value}\`);`,
                     "selectframe": (x) => `
@@ -407,23 +409,10 @@ async function getContainer(selector) {
         }
     }
 }
-function getLink(target) {
-    var find = 'a href="*+target';
-    var source = await page.content();
-    var regex, link, matches = [];
-  
-    
-    var find = tVal.split('*');
-    var toReg = "\\" + find[0] + "(.*?)" + "\\" + find[1];
-    regex = new RegExp(toReg, 'gi');
-    matches = source.match(regex);
-    link = matches[0].match(/"([^"]+)"/)[1];
 
-    return link;
-}
-function locatorToSelector(target) {
+async function locatorToSelector(target) {
     var selector;
-
+    await page.addScriptTag({ url: 'https://code.jquery.com/jquery-3.2.1.min.js' });
     if (target.substring(0, 1) === "/" || target.substring(0, 6) === "xpath=") {
         if (target.indexOf('@') != target.lastIndexOf('@')) {
             var attributeSelector = target.substring(target.lastIndexOf('@'), target.length);
@@ -438,9 +427,9 @@ function locatorToSelector(target) {
     } else if (target.substring(0, 5) === "name=") {
         selector = "[name=" + target.substring(5, target.length) + "]";
     } else if (target.substring(0, 5) === "link=") {
-        selector = "[link=" + target.substring(5, target.length) + "]";
-        selector = getLink(target);
-        //Probably does not work, if meant to be used for ref attributes
+        selector = "//a[contains(text(),'" + target.substring(5, target.length) + "')]";
+        selector = xpath2css(selector);
+        console.log(selector);
     } else if (target.substring(0, 11) === "identifier=") {
         selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
     } else if (target.substring(0, 4) === "dom=") {
@@ -452,7 +441,41 @@ function locatorToSelector(target) {
     } else {
         selector = target;
     }
+    //console.log(page);
+    selector = await page.evaluate((s) => {
+        console.log('test');
+        jQuery.fn.extend({
+            getPath: function () {
+                var path, node = this;
+                while (node.length) {
+                    try {
+                        var realNode = node[0], name = realNode.localName;
+                        if (!name) break;
+                        name = name.toLowerCase();
 
+                        var parent = node.parent();
+                    } catch (error) {
+                        console.log('aaaaaah ah aaaaah ah ah');
+                    }
+                    var sameTagSiblings = parent.children(name);
+                    if (sameTagSiblings.length > 1) {
+                        allSiblings = parent.children();
+                        var index = allSiblings.index(realNode) + 1;
+                        if (index > 1) {
+                            name += ':nth-child(' + index + ')';
+                        }
+                    }
+
+                    path = name + (path ? '>' + path : '');
+                    node = parent;
+                }
+                return path;
+            }
+        });
+        var element = $(s);
+        return (element.getPath());
+
+    }, selector);
     return selector;
 }
 
@@ -515,7 +538,46 @@ async function assertionHelper(target, regex) {
         }
     }, target, regex);
 }
+function getRegexMatches(tVal, source) {
+    var regex;
+    if (tVal.substring(0, 6) === 'regex=') {
+        regex = new RegExp(tVal.substring(6), 'gi');
+    } else {
+        var find = tVal.split('*');
+        var toReg = "\\\\" + find[0] + "(.*?)" + "\\\\" + find[1];
+        regex = new RegExp(toReg, 'gi');
+    }
+    return source.match(regex);
+}
+sourceExtract_ = async function sourceExtract_(target) {
+    try {
+        var source = await page.content();
+        var matches = [];
+        var tVal = target, locator = -1;
+        var tArr = target.split('@');
+        if (tArr.length > 1 && typeof (parseInt(tArr[tArr.length - 1])) === typeof (1)) {
+            tVal = '';
+            locator = parseInt(tArr[tArr.length - 1]);
+            for (var i = 0; i < tArr.length - 1; i++) {
+                tVal += tArr[i];
+            }
+        }
+        matches = getRegexMatches(tVal, source);
+        if (matches === null || matches.length === 0) {
+            console.log('#nomatchfound');
+        } else if (locator < 0) {
+            console.log(matches);
+        }
+        else {
+            console.log(matches[locator - 1]);
+        }
+        return matches;
+    } catch (error) {
+        console.log(error);
+    }
 
+
+};
 (async () => {
 	let browser = await puppeteer.launch({headless: false, args:['--start-maximized']});
     var initPage = await browser.newPage();
