@@ -147,7 +147,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
                     "sendkeys": (x) => `
-                        await delay(1000);
+                        await delay(500);
                         await page.keyboard.press(keyDictionary[\`\\${x.value}\`]);
                         //await waitForPageEnter(\`${x.value}\`);`,
                     "selectframe": (x) => `
@@ -424,11 +424,11 @@ async function locatorToSelector(target) {
     } else if (target.substring(0, 3) === "id=") {
         selector = "[id=" + target.substring(3, target.length) + "]";
     } else if (target.substring(0, 5) === "name=") {
-        selector = "[name=" + target.substring(5, target.length) + "]";
+        selector = "//input[@name="+target.substring(5, target.length) + "]";
+        selector = xpath2css(selector);
     } else if (target.substring(0, 5) === "link=") {
         selector = "//a[contains(text(),'" + target.substring(5, target.length) + "')]";
         selector = xpath2css(selector);
-        console.log(selector);
     } else if (target.substring(0, 11) === "identifier=") {
         selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
     } else if (target.substring(0, 4) === "dom=") {
