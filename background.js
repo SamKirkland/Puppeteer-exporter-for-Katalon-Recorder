@@ -139,11 +139,19 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                                 }, selector);
                         
                                 if (isALink) {
-                                    const navigationPromise = page.waitForNavigation();
-                                    await container.click(selector);
-                                    await navigationPromise;
+                                    // const navigationPromise = page.waitForNavigation();
+                                    // await container.click(selector);
+                                    // await navigationPromise;
+                                    const elementHandle = await container.waitForSelector(selector);
+                                    const jshandle = await elementHandle.getProperty('href');
+                                    property = await jshandle.jsonValue();
+                                    await page.goto(property);
                                 } else {
-                                    await container.click(selector);
+                                    //await container.click(selector);
+                                    await container.evaluate((s) =>{
+                                            document.querySelector(s).click();
+                                    }, selector);
+                                    
                                 }
                             } catch (error) {
                                 console.log(error);
@@ -159,8 +167,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "comment": (x) => `// ${x.target}`,
                     "sendkeys": (x) => `
                         await delay(500);
-                        await page.keyboard.press(keyDictionary[\`\\${x.value}\`]);
-                        //await waitForPageEnter(\`${x.value}\`);`,
+                        await page.keyboard.press(keyDictionary[\`\\${x.value}\`]);`,
                     "selectframe": (x) => `
                         if(\`${x.target}\` === 'relative=parent') {
                             page = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {
@@ -426,33 +433,33 @@ async function locatorToSelector(target) {
     await page.addScriptTag({ url: 'https://code.jquery.com/jquery-3.2.1.min.js' });
     if (target.substring(0, 1) === "/" || target.substring(0, 6) === "xpath=") {
         if (target.indexOf('@') != target.lastIndexOf('@')) {
-            var attributeSelector = target.substring(target.lastIndexOf('@'), target.length);
-            target = target.substring(0, target.lastIndexOf('@'));
-            selector = xpath2css(target);
+            var attributeSelector =  await target.substring(target.lastIndexOf('@'), target.length);
+            target = await target.substring(0, target.lastIndexOf('@'));
+            selector = await xpath2css(target);
             selector += attributeSelector;
         } else {
-            selector = xpath2css(target);
+            selector = await xpath2css(target);
         }
     } else if (target.substring(0, 3) === "id=") {
-        selector = "[id=" + target.substring(3, target.length) + "]";
+        selector = "//[@id=" + await target.substring(3, target.length) + "]";
+        selector =  await xpath2css(selector);
     } else if (target.substring(0, 5) === "name=") {
-        selector = "//input[@name="+target.substring(5, target.length) + "]";
-        selector = xpath2css(selector);
+        selector = "//input[@name=" + await target.substring(5, target.length) + "]";
+        selector = await xpath2css(selector);      
     } else if (target.substring(0, 5) === "link=") {
-        selector = "//a[contains(text(),'" + target.substring(5, target.length) + "')]";
-        selector = xpath2css(selector);
+        selector = "//a[contains(text(),'" + await target.substring(5, target.length) + "')]";
+        selector =  await xpath2css(selector);
     } else if (target.substring(0, 11) === "identifier=") {
-        selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
+        selector = "[name=" +  await target.substring(11, target.length) + "],[id=" + await target.substring(11, target.length) + "]";
     } else if (target.substring(0, 4) === "dom=") {
         //TODO
     } else if (target.substring(0, 4) === "css=") {
-        selector = target.substring(4, target.length);
+        selector = await target.substring(4, target.length);
     } else if (target.substring(0, 3) === "ui=") {
         //TODO
     } else {
         selector = target;
     }
-    //console.log(page);
     selector = await page.evaluate((s) => {
         console.log('test');
         jQuery.fn.extend({
@@ -493,7 +500,7 @@ async function elementExists(selector) {
         if (elementhandle) {
             return true;
         } else {
-            var frames = await curpage.frames();
+            var frames = await page.frames();
             var i, length = frames.length;
             for (i = 0; i < length; i++) {
                 elementhandle = await frames[i].$(selector);
@@ -569,6 +576,9 @@ async function assertionHelper(target, regex) {
     var browserTabs = [];
     browserTabs.push(page);
 
+    await page.on('frameNavigated', () => {
+        page.waitForNavigation();
+    });
 
     // exported test
     ${convertedCommands.join('\n\t')}
