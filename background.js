@@ -648,6 +648,7 @@ async function assertionHelper(target, regex) {
     page = initPage;
     var selector = null;
     var container = null;
+    var lastIndex = 0;
     await page._client.send('Emulation.clearDeviceMetricsOverride');
 
     var winWidth = await page.evaluate(
