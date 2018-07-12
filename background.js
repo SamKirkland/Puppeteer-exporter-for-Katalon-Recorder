@@ -126,37 +126,42 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "click": (x) => `
                             try {
                                 await delay(2000);
-                                syncSelector = locatorToSyncSelector('${x.target}');
+                                syncSelector = locatorToSyncSelector(\`${x.target}\`);
                                 container = await getContainer(syncSelector, page);
                                 await container.waitForSelector(syncSelector, { timeout: 5000, visible: true });
                                 await container.click(syncSelector);
                             } catch (error) {
-                                selector = await locatorToSelector('${x.target}');
-                                await container.waitForSelector(selector, { timeout: 5000, visible: true });
-                                container = await getContainer(selector, page);
-                                await container.waitFor(500);
-                
-                                var isALink = await container.evaluate((s) => {
-                                    var element = document.querySelector(s);
-                                    var tag = element.tagName.toLowerCase();
-                                    var href = element.href;
-                                    return (href !== undefined && href !== "" && tag === 'a');
-                                }, selector);
-                
-                                if (isALink) {
-                                    const elementHandle = await container.waitForSelector(selector);
-                                    const jshandle = await elementHandle.getProperty('href');
-                                    property = await jshandle.jsonValue();
-                                    await page.goto(property);
-                                } else {
-                                    try {
-                                        await container.click(selector);
-                                    } catch (error) {
-                                        await container.evaluate((s) => {
-                                            document.querySelector(s).click();
-                                        }, selector);
+                                try {
+                                    selector = await locatorToSelector(\`${x.target}\`);
+                                    await container.waitForSelector(selector, { timeout: 5000, visible: true });
+                                    container = await getContainer(selector, page);
+                                    await container.waitFor(500);
+                        
+                                    var isALink = await container.evaluate((s) => {
+                                        var element = document.querySelector(s);
+                                        var tag = element.tagName.toLowerCase();
+                                        var href = element.href;
+                                        return (href !== undefined && href !== "" && tag === 'a');
+                                    }, selector);
+                        
+                                    if (isALink) {
+                                        const elementHandle = await container.waitForSelector(selector);
+                                        const jshandle = await elementHandle.getProperty('href');
+                                        property = await jshandle.jsonValue();
+                                        await page.goto(property);
+                                    } else {
+                                        try {
+                                            await container.click(selector);
+                                        } catch (error) {
+                                            await container.evaluate((s) => {
+                                                document.querySelector(s).click();
+                                            }, selector);
+                                        }
                                     }
+                                } catch (error) {
+                                    await tempContainer.click(selector);
                                 }
+                        
                             }
                             // await delay(1000);
                             // selector = await locatorToSelector(\`${x.target}\`);
@@ -206,11 +211,28 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                         await delay(500);
                         await page.keyboard.press(keyDictionary[\`\\${x.value}\`]);`,
                     "selectframe": (x) => `
-                        if(\`${x.target}\` === 'relative=parent') {
-                            page = page.frames()[0];
-                        } else if('${x.target}'.substring(0, 5) === 'index') {
-                            page=page.frames()[parseInt('${x.target}'.substring(6))];
-                        };`,
+                        await delay(4000);
+                        var frames = await page.frames();
+                        var tempContainer = page;
+                        //relative=top will change frame to top frame
+                        if (\`${x.value}\` === 'relative=top') {
+                            tempContainer = frames[lastIndex].parentFrame();
+                            //console.log(tempContainer);
+                        }
+                        //index=x will change frame to frame x
+                        else if (\`${x.value}\`.substring(0, 5) === 'index') {
+                            var num = \`${x.value}\`.substring(6);
+                            var index = parseInt(num);
+                            tempContainer = frames[index];
+                        }
+                        //finds frame through name and target
+                        else {
+                            tempContainer = await frames.find(f => f.name() === \`${x.value}\`.substring(3, \`${x.value}\`.length));
+                            //if it still hasn't found, set equal to last index used
+                            if (tempContainer === null) {
+                                tempContainer = frames[lastIndex];
+                            }
+                        }`,
                     "captureScreenshot": (x) => `
                         let name = ${x.target} + ".jpg";
                         await page.goto(page.url());
