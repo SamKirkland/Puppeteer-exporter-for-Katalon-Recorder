@@ -124,39 +124,76 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                 seleniumToPuppeteer = {
                     "open": (x) => `\t\t\t\t\tawait page.goto('${x.target}');\n`,
                     "click": (x) => `
-                            selector = await locatorToSelector(\`${x.target}\`);
-                            container = await getContainer(selector);
-                            await container.addScriptTag({ url: 'https://code.jquery.com/jquery-3.2.1.min.js' });
                             try {
-                                await container.waitFor(500);
+                                await delay(2000);
+                                syncSelector = locatorToSyncSelector('${x.target}');
+                                container = await getContainer(syncSelector, page);
+                                await container.waitForSelector(syncSelector, { timeout: 5000, visible: true });
+                                await container.click(syncSelector);
+                            } catch (error) {
+                                selector = await locatorToSelector('${x.target}');
                                 await container.waitForSelector(selector, { timeout: 5000, visible: true });
-                        
+                                container = await getContainer(selector, page);
+                                await container.waitFor(500);
+                
                                 var isALink = await container.evaluate((s) => {
                                     var element = document.querySelector(s);
                                     var tag = element.tagName.toLowerCase();
                                     var href = element.href;
                                     return (href !== undefined && href !== "" && tag === 'a');
                                 }, selector);
-                        
+                
                                 if (isALink) {
-                                    // const navigationPromise = page.waitForNavigation();
-                                    // await container.click(selector);
-                                    // await navigationPromise;
                                     const elementHandle = await container.waitForSelector(selector);
                                     const jshandle = await elementHandle.getProperty('href');
                                     property = await jshandle.jsonValue();
                                     await page.goto(property);
                                 } else {
-                                    //await container.click(selector);
-                                    await container.evaluate((s) =>{
+                                    try {
+                                        await container.click(selector);
+                                    } catch (error) {
+                                        await container.evaluate((s) => {
                                             document.querySelector(s).click();
-                                    }, selector);
-                                    
+                                        }, selector);
+                                    }
                                 }
-                            } catch (error) {
-                                console.log(error);
-                                await page.mouse.down();
-                            }`,
+                            }
+                            // await delay(1000);
+                            // selector = await locatorToSelector(\`${x.target}\`);
+                            // container = await getContainer(selector);
+                            // await container.addScriptTag({ url: 'https://code.jquery.com/jquery-3.2.1.min.js' });
+                            // try {
+                            //     await container.waitFor(500);
+                            //     await container.waitForSelector(selector, { timeout: 5000, visible: true });
+                        
+                            //     var isALink = await container.evaluate((s) => {
+                            //         var element = document.querySelector(s);
+                            //         var tag = element.tagName.toLowerCase();
+                            //         var href = element.href;
+                            //         return (href !== undefined && href !== "" && tag === 'a');
+                            //     }, selector);
+                        
+                            //     if (isALink) {
+                            //         // const navigationPromise = page.waitForNavigation();
+                            //         // await container.click(selector);
+                            //         // await navigationPromise;
+                            //         const elementHandle = await container.waitForSelector(selector);
+                            //         const jshandle = await elementHandle.getProperty('href');
+                            //         property = await jshandle.jsonValue();
+                            //         await page.goto(property);
+                            //     } else {
+                            //         try{
+                            //             await container.click(selector);
+                            //         }catch(error) {
+                            //             await container.evaluate((s) =>{
+                            //                 document.querySelector(s).click();
+                            //             }, selector);
+                            //         }
+                            //     }
+                            // } catch (error) {
+                            //     console.log(error);
+                            //     await page.mouse.down();
+                            // }`,
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
                     "type": (x) => `
@@ -170,7 +207,8 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                         await page.keyboard.press(keyDictionary[\`\\${x.value}\`]);`,
                     "selectframe": (x) => `
                         if(\`${x.target}\` === 'relative=parent') {
-                            page = page.frames()[0];\n\t}\n\telse if('${x.target}'.substring(0, 5) === 'index') {
+                            page = page.frames()[0];
+                        } else if('${x.target}'.substring(0, 5) === 'index') {
                             page=page.frames()[parseInt('${x.target}'.substring(6))];
                         };`,
                     "captureScreenshot": (x) => `
@@ -183,25 +221,19 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "bringBrowserToForeground": (x) => `await page.bringToFront();`,
                     "refresh": (x) => `await page.reload();`,
                     "selectWindow": (x) => `
-                        if (${x.target}.substring(4).toLowerCase() === 'open') {
+                        if (${x.target}.substring(9) === 'local') {
+                            await browserTabs[0].bringToFront();
+                            page = browserTabs[0];
+                            await page.waitFor(1000);
+                    } else if (${x.target}.substring(9) > browserTabs.length) {
                         var newTab = await page.browser().newPage();
                         await newTab.setViewport(page.viewport());
                         await newTab.goto(${x.value}, { waitUntil: 'networkidle2' });
                         await newTab.bringToFront();
                         await browserTabs.push(newTab);
                         page = newTab;
-                    } else if (
-                        ${x.target}.substring(4).toLowerCase() === 'closealltogether') {
-                        for (var i = 0; i < browserTabs.length; i++) {
-                            if (browserTabs[i] !== page) {
-                                await browserTabs[i].close();
-                            }
-                        }
-                        var newTabs = [page];
-                        browserTabs = [];
-                        browserTabs = newTabs;
-                    } else if (parseInt(${x.target}.substring(4)) >= 0) {
-                        var goto = parseInt(target.substring(4));
+                    } else if (parseInt(${x.target}.substring(9)) >= 0) {
+                        var goto = parseInt(target.substring(9));
                         await browserTabs[goto].bringToFront();
                         page = browserTabs[goto];
                         await page.waitFor(1000);
@@ -232,7 +264,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                             new Notification('Notification title', { body: t });
                         }, ${x.target});
                     }`,
-                    "assertAlert": (x) =>       `try {
+                    "assertAlert": (x) => `try {
                                                     await assertionHelper(${x.target}, \`/alert\\(['"]([^'"]+)['"]\\)/\`);
                                                     console.log("Target: '" + ${x.target} + "' found.");
                                                 } catch (error) {
@@ -380,7 +412,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "waitForVisible": (x) => `var selector = await locatorToSelector(${x.target}); var container = await getContainer(selector); return await container.waitForSelector(selector, { visible: true });`
                 }
 
-                if(payload.capabilityId === 'puppeteerBT') {
+                if (payload.capabilityId === 'puppeteerBT') {
                     //ex seleniumToPuppeteer[command] = `new instructions;`;
                 }
 
@@ -428,8 +460,43 @@ async function getContainer(selector) {
     }
 }
 
+function locatorToSyncSelector(target) {
+    var selector;
+
+    if (target.substring(0, 1) === "/" || target.substring(0, 6) === "xpath=") {
+        if (target.indexOf('@') != target.lastIndexOf('@')) {
+            var attributeSelector = target.substring(target.lastIndexOf('@'), target.length);
+            target = target.substring(0, target.lastIndexOf('@'));
+            selector = xpath2css(target);
+            selector += attributeSelector;
+        } else {
+            selector = xpath2css(target);
+        }
+    } else if (target.substring(0, 3) === "id=") {
+        selector = "[id=" + target.substring(3, target.length) + "]";
+    } else if (target.substring(0, 5) === "name=") {
+        selector = "//input[@name=" + target.substring(5, target.length) + "]";
+        selector = xpath2css(selector);
+    } else if (target.substring(0, 5) === "link=") {
+        selector = "//a[contains(text(),'" + target.substring(5, target.length) + "')]";
+        selector = xpath2css(selector);
+    } else if (target.substring(0, 11) === "identifier=") {
+        selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
+    } else if (target.substring(0, 4) === "dom=") {
+        //TODO
+    } else if (target.substring(0, 4) === "css=") {
+        selector = target.substring(4, target.length);
+    } else if (target.substring(0, 3) === "ui=") {
+        //TODO
+    } else {
+        selector = target;
+    }
+
+    return selector;
+}
 async function locatorToSelector(target) {
     var selector;
+    await delay(1000);
     await page.addScriptTag({ url: 'https://code.jquery.com/jquery-3.2.1.min.js' });
     if (target.substring(0, 1) === "/" || target.substring(0, 6) === "xpath=") {
         if (target.indexOf('@') != target.lastIndexOf('@')) {
@@ -562,26 +629,24 @@ async function assertionHelper(target, regex) {
     await page._client.send('Emulation.clearDeviceMetricsOverride');
 
     var winWidth = await page.evaluate(
-        () => {
-            return window.innerWidth;
+        async () => {
+            return await window.innerWidth;
         }
     );
     var winHeight = await page.evaluate(
-        () => {
-            return window.innerHeight;
+        async () => {
+            return await window.innerHeight;
         }
     );
     await page.setViewport({ width: winWidth, height: winHeight });
 
-    var browserTabs = [];
-    browserTabs.push(page);
+    var browserTabs = await [];
+    await browserTabs.push(page);
+    await delay(2000);
 
-    await page.on('frameNavigated', () => {
-        page.waitForNavigation();
-    });
 
     // exported test
-    ${convertedCommands.join('\n\t')}
+    ${convertedCommands.join('\n\t/**--------------------------------------------------------------------------------------------------------------------------**/')}
 
     await browser.close();
     
