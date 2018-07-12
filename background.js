@@ -115,342 +115,319 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
         var extension = '';
         var mimetype = '';
 
-        switch (payload.capabilityId) {
-            case 'puppeteer':
-                debugger;
-            case 'puppeteerBT':
-                debugger;
-            case 'puppeteerShared':
-                seleniumToPuppeteer = {
-                    "open": (x) => `\t\t\t\t\tawait page.goto('${x.target}');\n`,
-                    "click": (x) => `
-                            try {
-                                await delay(2000);
-                                syncSelector = locatorToSyncSelector(\`${x.target}\`);
-                                container = await getContainer(syncSelector, page);
-                                await container.waitForSelector(syncSelector, { timeout: 5000, visible: true });
-                                await container.click(syncSelector);
-                            } catch (error) {
-                                try {
-                                    selector = await locatorToSelector(\`${x.target}\`);
-                                    await container.waitForSelector(selector, { timeout: 5000, visible: true });
-                                    container = await getContainer(selector, page);
-                                    await container.waitFor(500);
-                        
-                                    var isALink = await container.evaluate((s) => {
-                                        var element = document.querySelector(s);
-                                        var tag = element.tagName.toLowerCase();
-                                        var href = element.href;
-                                        return (href !== undefined && href !== "" && tag === 'a');
-                                    }, selector);
-                        
-                                    if (isALink) {
-                                        const elementHandle = await container.waitForSelector(selector);
-                                        const jshandle = await elementHandle.getProperty('href');
-                                        property = await jshandle.jsonValue();
-                                        await page.goto(property);
-                                    } else {
-                                        try {
-                                            await container.click(selector);
-                                        } catch (error) {
-                                            await container.evaluate((s) => {
-                                                document.querySelector(s).click();
-                                            }, selector);
-                                        }
-                                    }
-                                } catch (error) {
-                                    await tempContainer.click(selector);
-                                }
-                        
-                            }
-                            // await delay(1000);
-                            // selector = await locatorToSelector(\`${x.target}\`);
-                            // container = await getContainer(selector);
-                            // await container.addScriptTag({ url: 'https://code.jquery.com/jquery-3.2.1.min.js' });
-                            // try {
-                            //     await container.waitFor(500);
-                            //     await container.waitForSelector(selector, { timeout: 5000, visible: true });
-                        
-                            //     var isALink = await container.evaluate((s) => {
-                            //         var element = document.querySelector(s);
-                            //         var tag = element.tagName.toLowerCase();
-                            //         var href = element.href;
-                            //         return (href !== undefined && href !== "" && tag === 'a');
-                            //     }, selector);
-                        
-                            //     if (isALink) {
-                            //         // const navigationPromise = page.waitForNavigation();
-                            //         // await container.click(selector);
-                            //         // await navigationPromise;
-                            //         const elementHandle = await container.waitForSelector(selector);
-                            //         const jshandle = await elementHandle.getProperty('href');
-                            //         property = await jshandle.jsonValue();
-                            //         await page.goto(property);
-                            //     } else {
-                            //         try{
-                            //             await container.click(selector);
-                            //         }catch(error) {
-                            //             await container.evaluate((s) =>{
-                            //                 document.querySelector(s).click();
-                            //             }, selector);
-                            //         }
-                            //     }
-                            // } catch (error) {
-                            //     console.log(error);
-                            //     await page.mouse.down();
-                            // }`,
-                    "echo": (x) => `console.log('${x.target}');`,
-                    "store": (x) => `let ${x.target} = ${x.value};`,
-                    "type": (x) => `
-                            try {
-                                selector = locatorToSyncSelector(\`${x.target}\`);
-                                container = await getContainer(selector);
-                                await container.type(selector, \`${x.value}\`);
-                            } catch (error) {
-                                selector = await locatorToSelector(\`${x.target}\`);
-                                container = await getContainer(selector);
-                                await container.type(selector, \`${x.value}\`);
-                            }`,
-                    "get": (x) => `await page.goto('${x.target}');`,
-                    "comment": (x) => `// ${x.target}`,
-                    "sendkeys": (x) => `
-                        await delay(500);
-                        await page.keyboard.press(keyDictionary[\`\\${x.value}\`]);`,
-                    "selectframe": (x) => `
-                        await delay(4000);
-                        var frames = await page.frames();
-                        var tempContainer = page;
-                        //relative=top will change frame to top frame
-                        if (\`${x.value}\` === 'relative=top') {
-                            tempContainer = frames[lastIndex].parentFrame();
-                        }
-                        //index=x will change frame to frame x
-                        else if (\`${x.value}\`.substring(0, 5) === 'index') {
-                            var num = \`${x.value}\`.substring(6);
-                            var index = parseInt(num);
-                            tempContainer = frames[index];
-                        }
-                        //finds frame through name and target
-                        else {
-                            tempContainer = await frames.find(f => f.name() === \`${x.value}\`.substring(3, \`${x.value}\`.length));
-                            //if it still hasn't found, set equal to last index used
-                            if (tempContainer === null) {
-                                tempContainer = frames[lastIndex];
-                            }
-                        }`,
-                    "captureScreenshot": (x) => `
-                        let name = ${x.target} + ".jpg";
-                        await page.goto(page.url());
-                        await page.screenshot({ path: name });`,
-                    "captureEntirePageScreenshot": (x) => `
-                        let name = ${x.target} + ".jpg";
-                        await page.screenshot({ path: name, fullPage: true });`,
-                    "bringBrowserToForeground": (x) => `await page.bringToFront();`,
-                    "refresh": (x) => `await page.reload();`,
-                    "selectWindow": (x) => `
-                        if (${x.target}.substring(9) === 'local') {
-                            await browserTabs[0].bringToFront();
-                            page = browserTabs[0];
-                            await page.waitFor(1000);
-                    } else if (${x.target}.substring(9) > browserTabs.length) {
-                        var newTab = await page.browser().newPage();
-                        await newTab.setViewport(page.viewport());
-                        await newTab.goto(${x.value}, { waitUntil: 'networkidle2' });
-                        await newTab.bringToFront();
-                        await browserTabs.push(newTab);
-                        page = newTab;
-                    } else if (parseInt(${x.target}.substring(9)) >= 0) {
-                        var goto = parseInt(target.substring(9));
-                        await browserTabs[goto].bringToFront();
-                        page = browserTabs[goto];
-                        await page.waitFor(1000);
-                    }`,
-                    "pause": (x) => `await page.waitFor(parseInt(${x.target}));`,
-                    "mouseOver": (x) => `
-                        var path = await locatorToSelector(${x.target});
-                        var container = await getContainer(path);
-                        await container.hover(path);`,
-                    "deleteAllVisibleCookies": (x) => `for (var i = 0; i < browserTabs.length; i++) {
-                        await browserTabs[i]._client.send('Network.clearBrowserCookies');
-                    }`,
-                    "echo": (x) => `var path, container;
-                    if (value !== "#shownotification") {
-                        path = await locatorToSelector(${x.target});
-                        container = await getContainer(path);
-                    } else {
-                        container = page;
+    switch (payload.capabilityId) {
+        case 'puppeteer':
+            debugger;
+        case 'puppeteerBT':
+            debugger;
+        case 'puppeteerShared':
+            seleniumToPuppeteer = {
+    "open": (x) => `\tawait page.goto('${x.target}');\n`,
+    "click": (x) => `
+        try {
+            await delay(2000);
+            syncSelector = locatorToSyncSelector(\`${x.target}\`);
+            container = await getContainer(syncSelector, page);
+            await container.waitForSelector(syncSelector, { timeout: 5000, visible: true });
+            await container.click(syncSelector);
+        } catch (error) {
+            try {
+                selector = await locatorToSelector(\`${x.target}\`);
+                await container.waitForSelector(selector, { timeout: 5000, visible: true });
+                container = await getContainer(selector, page);
+                await container.waitFor(500);
+
+                var isALink = await container.evaluate((s) => {
+                    var element = document.querySelector(s);
+                    var tag = element.tagName.toLowerCase();
+                    var href = element.href;
+                    return (href !== undefined && href !== "" && tag === 'a');
+                }, selector);
+
+                if (isALink) {
+                    const elementHandle = await container.waitForSelector(selector);
+                    const jshandle = await elementHandle.getProperty('href');
+                    property = await jshandle.jsonValue();
+                    await page.goto(property);
+                } else {
+                    try {
+                        await container.click(selector);
+                    } catch (error) {
+                        await container.evaluate((s) => {
+                            document.querySelector(s).click();
+                        }, selector);
                     }
-            
-                    if (container.evaluate('Notification.permission !== "granted"') && value === "#shownotification") {
-                        await container.evaluate('Notification.requestPermission()');
-                        await container.evaluate(t => {
-                            new Notification('Notification title', { body: t });
-                        }, ${x.target});
-                    } else if (value === "#shownotification") { //notification access already granted.
-                        await container.evaluate(t => {
-                            new Notification('Notification title', { body: t });
-                        }, ${x.target});
-                    }`,
-                    "assertAlert": (x) => `try {
-                                                    await assertionHelper(${x.target}, \`/alert\\(['"]([^'"]+)['"]\\)/\`);
-                                                    console.log("Target: '" + ${x.target} + "' found.");
-                                                } catch (error) {
-                                                    console.log("Confirmation message not found.");
-                                                }`,
-                    "assertText": (x) => `var property;
-
-                                        try {
-                                            var selector = await locatorToSelector(${x.target});
-                                            var container = await getContainer(selector);
-                                            const elementHandle = await container.waitForSelector(selector);
-                                            const jshandle = await elementHandle.getProperty('text');
-                                            property = await jshandle.jsonValue();
-                                        } catch (err) {
-                                            throw ("assertText FAILED. Unable to retreive element or property. Error message:\n" + err);
-                                            process.exit();
-                                        }
-                                    
-                                        if (property === ${x.value}) {
-                                            console.log("assertText PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-                                        } else {
-                                            throw ("assertText FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-                                            process.exit();
-                                        }`,
-                    "assertTitle": (x) => `var title;
-
-                                        try {
-                                            title = await page.title();
-                                        } catch (err) {
-                                            throw ("verifyTitle FAILED. Could not retreive title. Error message:\n" + err);
-                                            process.exit();
-                                        }
-                                    
-                                        if (title === ${x.value}) {
-                                            console.log("assertTitle PASSED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.");
-                                        } else {
-                                            throw "assertTitle FAILED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.";
-                                            process.exit();
-                                        }`,
-                    "assertElementPresent": (x) => `var selector = await locatorToSelector(${x.target});
-
-                                                if (await elementExists(selector)) {
-                                                    console.log("assertElementPresent PASSED.");
-                                                } else {
-                                                    throw ("assertElementPresent FAILED. Element not found.");
-                                                    process.exit();
-                                                }`,
-                    "assertPrompt": (x) => `try {
-                                            await assertionHelper(target, \`prompt\\(['"]([^'"]+)['"]\`);
-                                            console.log("Target: '" + target + "' found.");
-                                        } catch (error) {
-                                            console.log("Prompt message not found.");
-                                        }`,
-                    "assertValue": (x) => `var property;
-
-                                        try {
-                                            var selector = await locatorToSelector(${x.target});
-                                            var container = await getContainer(selector);
-                                            const elementHandle = await container.waitForSelector(selector);
-                                            const jshandle = await elementHandle.getProperty('value');
-                                            property = await jshandle.jsonValue();
-                                        } catch (err) {
-                                            throw ("assertValue FAILED. Unable to retreive element or property. Error message:\n" + err);
-                                            process.exit();
-                                        }
-                                    
-                                        if (property === ${x.value}) {
-                                            console.log("assertValue PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-                                        } else {
-                                            throw "assertValue FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.";
-                                            process.exit();
-                                        }`,
-                    "verifyChecked": (x) => `var property;
-
-                                        try {
-                                            var selector = await locatorToSelector(${x.target});
-                                            var container = await getContainer(selector);
-                                            const elementHandle = await container.waitForSelector(selector);
-                                            const jshandle = await elementHandle.getProperty('checked');
-                                            property = await jshandle.jsonValue();
-                                        } catch (err) {
-                                            return console.log("verifyChecked FAILED. Unable to retreive element or property. Error message:\n" + err);
-                                        }
-                                    
-                                        if (property) {
-                                            console.log("verifyChecked PASSED. Element is checked.");
-                                        } else {
-                                            console.log("verifyChecked FAILED. Element is unchecked.");
-                                        }`,
-                    "verifyElementPresent": (x) => `var selector = await locatorToSelector(${x.target});
-
-                                                if (await elementExists(selector)) {
-                                                    console.log("verifyElementPresent PASSED.");
-                                                } else {
-                                                    console.log("verifyElementPresent FAILED. Element not found.");
-                                                }`,
-                    "verifyText": (x) => `var property;
-
-                                        try {
-                                            var selector = await locatorToSelector(${x.target});
-                                            var container = await getContainer(selector);
-                                            const elementHandle = await container.waitForSelector(selector);
-                                            const jshandle = await elementHandle.getProperty('text');
-                                            property = await jshandle.jsonValue();
-                                        } catch (err) {
-                                            return console.log("verifyText FAILED. Unable to retreive element or property. Error message:\n" + err);
-                                        }
-                                    
-                                        if (property === ${x.value}) {
-                                            console.log("verifyText PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-                                        } else {
-                                            console.log("verifyText FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-                                        }`,
-                    "verifyTitle": (x) => `var title;
-
-                                        try {
-                                            title = await page.title();
-                                        } catch (err) {
-                                            return console.log("verifyTitle FAILED. Could not retreive title. Error message:\n" + err);
-                                        }
-                                    
-                                        if (title === ${x.value}) {
-                                            console.log("verifyTitle PASSED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.");
-                                        } else {
-                                            console.log("verifyTitle FAILED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.");
-                                        }`,
-                    "verifyValue": (x) => `var property;
-                                    
-                                        try {
-                                            var selector = await locatorToSelector(${x.target});
-                                            var container = await getContainer(selector);
-                                            const elementHandle = await container.waitForSelector(selector);
-                                            const jshandle = await elementHandle.getProperty('value');
-                                            property = await jshandle.jsonValue();
-                                        } catch (err) {
-                                            return console.log("verifyValue FAILED. Unable to retreive element or property. Error message:\n" + err);
-                                        }
-                                    
-                                        if (property === ${x.value}) {
-                                            console.log("verifyValue PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-                                        } else {
-                                            console.log("verifyValue FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-                                        }`,
-                    "waitForPageToLoad": (x) => `while (await page.evaluate('document.readyState !== \'complete\';'));`,
-                    "waitForVisible": (x) => `var selector = await locatorToSelector(${x.target}); var container = await getContainer(selector); return await container.waitForSelector(selector, { visible: true });`
                 }
+            } catch (error) {
+                await tempContainer.click(selector);
+            }
 
-                if (payload.capabilityId === 'puppeteerBT') {
-                    //ex seleniumToPuppeteer[command] = `new instructions;`;
-                }
+        }`,                        
+    "store": (x) => `\tlet ${x.target} = ${x.value};\n`,
+    "type": (x) => `
+        try {
+            selector = locatorToSyncSelector(\`${x.target}\`);
+            container = await getContainer(selector);
+            await container.type(selector, \`${x.value}\`);
+        } catch (error) {
+            selector = await locatorToSelector(\`${x.target}\`);
+            container = await getContainer(selector);
+            await container.type(selector, \`${x.value}\`);
+        }`,        
+    "get": (x) => `\tawait page.goto('${x.target}');\n`,
+    "comment": (x) => `\t// ${x.target}\n`,
+    "sendkeys": (x) => `
+        await delay(500);
+        await page.keyboard.press(keyDictionary[\`\\${x.value}\`]);`,
+    "selectframe": (x) => `
+        await delay(4000);
+        var frames = await page.frames();
+        var tempContainer = page;
+        //relative=top will change frame to top frame
+        if (\`${x.value}\` === 'relative=top') {
+            tempContainer = frames[lastIndex].parentFrame();
+        }
+        //index=x will change frame to frame x
+        else if (\`${x.value}\`.substring(0, 5) === 'index') {
+            var num = \`${x.value}\`.substring(6);
+            var index = parseInt(num);
+            tempContainer = frames[index];
+        }
+        //finds frame through name and target
+        else {
+            tempContainer = await frames.find(f => f.name() === \`${x.value}\`.substring(3, \`${x.value}\`.length));
+            //if it still hasn't found, set equal to last index used
+            if (tempContainer === null) {
+                tempContainer = frames[lastIndex];
+            }
+        }`,                    
+    "captureScreenshot": (x) => `
+        let name = ${x.target} + ".jpg";
+        await page.goto(page.url());
+        await page.screenshot({ path: name });`,                
+    "captureEntirePageScreenshot": (x) => `
+        let name = ${x.target} + ".jpg";
+        await page.screenshot({ path: name, fullPage: true });`,                
+    "bringBrowserToForeground": (x) => `\tawait page.bringToFront();\n`,
+    "refresh": (x) => `\tawait page.reload();\n`,
+    "selectWindow": (x) => `
+        if (${x.target}.substring(9) === 'local') {
+            await browserTabs[0].bringToFront();
+            page = browserTabs[0];
+            await page.waitFor(1000);
+        } else if (${x.target}.substring(9) > browserTabs.length) {
+            var newTab = await page.browser().newPage();
+            await newTab.setViewport(page.viewport());
+            await newTab.goto(${x.value}, { waitUntil: 'networkidle2' });
+            await newTab.bringToFront();
+            await browserTabs.push(newTab);
+            page = newTab;
+        } else if (parseInt(${x.target}.substring(9)) >= 0) {
+            var goto = parseInt(target.substring(9));
+            await browserTabs[goto].bringToFront();
+            page = browserTabs[goto];
+            await page.waitFor(1000);
+        }`,            
+    "pause": (x) => `\tawait page.waitFor(parseInt(${x.target}));\n`,
+    "mouseOver": (x) => `
+        var path = await locatorToSelector(${x.target});
+        var container = await getContainer(path);
+        await container.hover(path);`,                
+    "deleteAllVisibleCookies": (x) => `
+        for (var i = 0; i < browserTabs.length; i++) {
+        await browserTabs[i]._client.send('Network.clearBrowserCookies');
+    }`,
+    "echo": (x) => `
+        var path, container;
+        if (value !== "#shownotification") {
+            path = await locatorToSelector(${x.target});
+            container = await getContainer(path);
+        } else {
+            container = page;
+        }
 
-                let convertedCommands = commands.map((c) => {
-                    let equivCommand = seleniumToPuppeteer[c.command.toLowerCase()];
+        if (container.evaluate('Notification.permission !== "granted"') && value === "#shownotification") {
+            await container.evaluate('Notification.requestPermission()');
+            await container.evaluate(t => {
+                new Notification('Notification title', { body: t });
+            }, ${x.target});
+        } else if (value === "#shownotification") { //notification access already granted.
+            await container.evaluate(t => {
+                new Notification('Notification title', { body: t });
+            }, ${x.target});
+        }`,            
+    "assertAlert": (x) => `
+        try {
+            await assertionHelper(${x.target}, \`/alert\\(['"]([^'"]+)['"]\\)/\`);
+            console.log("Target: '" + ${x.target} + "' found.");
+        } catch (error) {
+            console.log("Confirmation message not found.");
+        }`,                                    
+    "assertText": (x) => `
+        var property;
+        try {
+            var selector = await locatorToSelector(${x.target});
+            var container = await getContainer(selector);
+            const elementHandle = await container.waitForSelector(selector);
+            const jshandle = await elementHandle.getProperty('text');
+            property = await jshandle.jsonValue();
+        } catch (err) {
+            throw ("assertText FAILED. Unable to retreive element or property. Error message:\n" + err);
+            process.exit();
+        }
+    
+        if (property === ${x.value}) {
+            console.log("assertText PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
+        } else {
+            throw ("assertText FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
+            process.exit();
+        }`,
+                                        
+    "assertTitle": (x) => `
+        var title;
+        try {
+            title = await page.title();
+        } catch (err) {
+            throw ("verifyTitle FAILED. Could not retreive title. Error message:\n" + err);
+            process.exit();
+        }
+    
+        if (title === ${x.value}) {
+            console.log("assertTitle PASSED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.");
+        } else {
+            throw "assertTitle FAILED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.";
+            process.exit();
+        }`,
+                                        
+    "assertElementPresent": (x) => `
+        var selector = await locatorToSelector(${x.target});
+        if (await elementExists(selector)) {
+            console.log("assertElementPresent PASSED.");
+        } else {
+            throw ("assertElementPresent FAILED. Element not found.");
+            process.exit();
+        }`,
+                                                
+    "assertPrompt": (x) => `
+        try {
+            await assertionHelper(target, \`prompt\\(['"]([^'"]+)['"]\`);
+            console.log("Target: '" + target + "' found.");
+        } catch (error) {
+            console.log("Prompt message not found.");
+        }`,                                
+    "assertValue": (x) => `
+        var property;
+        try {
+            var selector = await locatorToSelector(${x.target});
+            var container = await getContainer(selector);
+            const elementHandle = await container.waitForSelector(selector);
+            const jshandle = await elementHandle.getProperty('value');
+            property = await jshandle.jsonValue();
+        } catch (err) {
+            throw ("assertValue FAILED. Unable to retreive element or property. Error message:\n" + err);
+            process.exit();
+        }
+    
+        if (property === ${x.value}) {
+            console.log("assertValue PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
+        } else {
+            throw "assertValue FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.";
+            process.exit();
+        }`,
+                                        
+    "verifyChecked": (x) => `
+        var property;
+        try {
+            var selector = await locatorToSelector(${x.target});
+            var container = await getContainer(selector);
+            const elementHandle = await container.waitForSelector(selector);
+            const jshandle = await elementHandle.getProperty('checked');
+            property = await jshandle.jsonValue();
+        } catch (err) {
+            return console.log("verifyChecked FAILED. Unable to retreive element or property. Error message:\n" + err);
+        }
+    
+        if (property) {
+            console.log("verifyChecked PASSED. Element is checked.");
+        } else {
+            console.log("verifyChecked FAILED. Element is unchecked.");
+        }`,                                        
+    "verifyElementPresent": (x) => `
+        var selector = await locatorToSelector(${x.target});
+        if (await elementExists(selector)) {
+            console.log("verifyElementPresent PASSED.");
+        } else {
+            console.log("verifyElementPresent FAILED. Element not found.");
+        }`,            
+    "verifyText": (x) => `
+        var property;
+        try {
+            var selector = await locatorToSelector(${x.target});
+            var container = await getContainer(selector);
+            const elementHandle = await container.waitForSelector(selector);
+            const jshandle = await elementHandle.getProperty('text');
+            property = await jshandle.jsonValue();
+        } catch (err) {
+            return console.log("verifyText FAILED. Unable to retreive element or property. Error message:\n" + err);
+        }
+    
+        if (property === ${x.value}) {
+            console.log("verifyText PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
+        } else {
+            console.log("verifyText FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
+        }`,
+                                        
+    "verifyTitle": (x) => `
+        var title;
+        try {
+            title = await page.title();
+        } catch (err) {
+            return console.log("verifyTitle FAILED. Could not retreive title. Error message:\n" + err);
+        }
+    
+        if (title === ${x.value}) {
+            console.log("verifyTitle PASSED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.");
+        } else {
+            console.log("verifyTitle FAILED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.");
+        }`,
+                                        
+    "verifyValue": (x) => `
+        var property;
+        try {
+            var selector = await locatorToSelector(${x.target});
+            var container = await getContainer(selector);
+            const elementHandle = await container.waitForSelector(selector);
+            const jshandle = await elementHandle.getProperty('value');
+            property = await jshandle.jsonValue();
+        } catch (err) {
+            return console.log("verifyValue FAILED. Unable to retreive element or property. Error message:\n" + err);
+        }
+    
+        if (property === ${x.value}) {
+            console.log("verifyValue PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
+        } else {
+            console.log("verifyValue FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
+        }`,                            
+                                        
+    "waitForPageToLoad": (x) => `\twhile (await page.evaluate('document.readyState !== \'complete\';'));\n`,
+    "waitForVisible": (x) => `
+        var selector = await locatorToSelector(${x.target}); 
+        var container = await getContainer(selector); 
+        return await container.waitForSelector(selector, { visible: true });`
+    }
 
-                    if (typeof equivCommand === "function") {
-                        return equivCommand(c);
-                    }
-                    //return `alert('Command "${c.command.toLowerCase()}" not supported');`; //, ${c.target}', '${x.value}');`;
-                });
+    if (payload.capabilityId === 'puppeteerBT') {
+        //ex seleniumToPuppeteer[command] = `new instructions;`;
+    }           
+    let convertedCommands = commands.map((c) => {
+        let equivCommand = seleniumToPuppeteer[c.command.toLowerCase()];
+
+        if (typeof equivCommand === "function") {
+            return equivCommand(c);
+        }
+        //return `alert('Command "${c.command.toLowerCase()}" not supported');`; //, ${c.target}', '${x.value}');`;
+    });
+                
 
                 content =
                     `const puppeteer = require('puppeteer');
