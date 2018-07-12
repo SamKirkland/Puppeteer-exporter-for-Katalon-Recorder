@@ -223,7 +223,6 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                         //relative=top will change frame to top frame
                         if (\`${x.value}\` === 'relative=top') {
                             tempContainer = frames[lastIndex].parentFrame();
-                            //console.log(tempContainer);
                         }
                         //index=x will change frame to frame x
                         else if (\`${x.value}\`.substring(0, 5) === 'index') {
@@ -652,6 +651,7 @@ async function assertionHelper(target, regex) {
 	let browser = await puppeteer.launch({headless: false, args:['--start-maximized']});
     var initPage = await browser.newPage();
     page = initPage;
+    var tempContainer = page;
     var selector = null;
     var container = null;
     var lastIndex = 0;
