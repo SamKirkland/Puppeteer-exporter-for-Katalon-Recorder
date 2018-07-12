@@ -202,9 +202,15 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "echo": (x) => `console.log('${x.target}');`,
                     "store": (x) => `let ${x.target} = ${x.value};`,
                     "type": (x) => `
-                        selector = await locatorToSelector(\`${x.target}\`);
-                        container = await getContainer(selector);
-                        await container.type(selector, \`${x.value}\`);`,
+                            try {
+                                selector = locatorToSyncSelector(\`${x.target}\`);
+                                container = await getContainer(selector);
+                                await container.type(selector, \`${x.value}\`);
+                            } catch (error) {
+                                selector = await locatorToSelector(\`${x.target}\`);
+                                container = await getContainer(selector);
+                                await container.type(selector, \`${x.value}\`);
+                            }`,
                     "get": (x) => `await page.goto('${x.target}');`,
                     "comment": (x) => `// ${x.target}`,
                     "sendkeys": (x) => `
