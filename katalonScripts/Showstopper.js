@@ -30,7 +30,20 @@ async function getContainer(selector) {
         }
     }
 }
+function getLink(target) {
+    // var find = 'a href="*+target';
+    // var source = await page.content();
+    // var regex, link, matches = [];
+  
+    
+    // var find = tVal.split('*');
+    // var toReg = "\" + find[0] + "(.*?)" + "\" + find[1];
+    // regex = new RegExp(toReg, 'gi');
+    // matches = source.match(regex);
+    // link = matches[0].match(/"([^"]+)"/)[1];
 
+    //return link;
+}
 function locatorToSelector(target) {
     var selector;
 
@@ -49,6 +62,7 @@ function locatorToSelector(target) {
         selector = "[name=" + target.substring(5, target.length) + "]";
     } else if (target.substring(0, 5) === "link=") {
         selector = "[link=" + target.substring(5, target.length) + "]";
+        selector = getLink(target);
         //Probably does not work, if meant to be used for ref attributes
     } else if (target.substring(0, 11) === "identifier=") {
         selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
@@ -89,21 +103,21 @@ async function elementExists(selector) {
 }
 var page;
 var keyDictionary = {
-    '$(KEY_LEFT)': 'ArrowLeft',
-    '$(KEY_UP)': 'ArrowUp',
-    '$(KEY_RIGHT)': 'ArrowRight',
-    '$(KEY_DOWN)': 'ArrowDown',
-    '$(KEY_PGUP)': 'PageUp',
-    '$(KEY_PAGE_UP)': 'PageUp',
-    '$(KEY_PGDN)': 'PageDown',
-    '$(KEY_PAGE_DOWN)': 'PageDown',
-    '$(KEY_BKSP)': 'Backspace',
-    '$(KEY_BACKSPACE)': 'Backspace',
-    '$(KEY_DEL)': 'Delete',
-    '$(KEY_DELETE)': 'Delete',
+    '${KEY_LEFT}': 'ArrowLeft',
+    '${KEY_UP}': 'ArrowUp',
+    '${KEY_RIGHT}': 'ArrowRight',
+    '${KEY_DOWN}': 'ArrowDown',
+    '${KEY_PGUP}': 'PageUp',
+    '${KEY_PAGE_UP}': 'PageUp',
+    '${KEY_PGDN}': 'PageDown',
+    '${KEY_PAGE_DOWN}': 'PageDown',
+    '${KEY_BKSP}': 'Backspace',
+    '${KEY_BACKSPACE}': 'Backspace',
+    '${KEY_DEL}': 'Delete',
+    '${KEY_DELETE}': 'Delete',
     '${KEY_ENTER}': 'Enter',
-    '$(KEY_TAB)': 'Tab',
-    '$(KEY_HOME)': 'Home'
+    '${KEY_TAB}': 'Tab',
+    '${KEY_HOME}': 'Home'
 };
 
 async function assertionHelper(target, regex) {
@@ -113,7 +127,7 @@ async function assertionHelper(target, regex) {
         for (var i = 0; i < elem.length; i++) {
             var txt = elem[i].textContent.match(reg);
             if (txt) {
-                var checkText = txt[1].replace('\n', '\n');
+                var checkText = txt[1].replace('\\n', '\n');
                 if (checkText === t) {
                     break;
                 }
@@ -151,420 +165,542 @@ async function assertionHelper(target, regex) {
     // exported test
     await page.goto('https://www.google.com/');
 
-	selector = locatorToSelector(`id=lst-ib`);
+	
+                        selector = locatorToSelector(`id=lst-ib`);
                         container = await getContainer(selector);
                         await container.type(selector, `google`);
-
-	await page.keyboard.sendCharacter(`${KEY_ENTER}`);
-                        await waitForPageEnter(`${KEY_ENTER}`);
-
+	
+                        await page.keyboard.press(keyDictionary[`\${KEY_ENTER}`]);
+                        //await waitForPageEnter(`${KEY_ENTER}`);
 	
                             selector = locatorToSelector(`link=Google`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`link=Google`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//form[@id='tsf']/div[2]/div[3]/center/div/div/div[9]/span`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//form[@id='tsf']/div[2]/div[3]/center/div/div/div[9]/span`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`link=About`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`link=About`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	await page.goto('https://www.google.com/');
 
 	
                             selector = locatorToSelector(`link=Images`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`link=Images`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='gbwa']/div/a`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='gbwa']/div/a`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//a[@id='gb8']/span[2]`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//a[@id='gb8']/span[2]`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`id=searchboxinput`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`id=searchboxinput`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
-	selector = locatorToSelector(`id=searchboxinput`);
+	
+                        selector = locatorToSelector(`id=searchboxinput`);
                         container = await getContainer(selector);
                         await container.type(selector, `ames, ia`);
-
-	await page.keyboard.sendCharacter(`${KEY_ENTER}`);
-                        await waitForPageEnter(`${KEY_ENTER}`);
-
+	
+                        await page.keyboard.press(keyDictionary[`\${KEY_ENTER}`]);
+                        //await waitForPageEnter(`${KEY_ENTER}`);
 	
                             selector = locatorToSelector(`id=pane > div > div.widget-pane-content.scrollable-y > div > div > div.section-hero-header.white-foreground > button.section-hero-header-directions.noprint > div > div`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`id=pane > div > div.widget-pane-content.scrollable-y > div > div > div.section-hero-header.white-foreground > button.section-hero-header-directions.noprint > div > div`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
-	selector = locatorToSelector(`//div[@id='sb_ifc51']/input`);
+	
+                        selector = locatorToSelector(`//div[@id='sb_ifc51']/input`);
                         container = await getContainer(selector);
                         await container.type(selector, `archangel, russia`);
-
-	selector = locatorToSelector(`//div[@id='sb_ifc51']/input`);
+	
+                        selector = locatorToSelector(`//div[@id='sb_ifc51']/input`);
                         container = await getContainer(selector);
                         await container.type(selector, `archangel, russia`);
-
-	await page.keyboard.sendCharacter(`${KEY_ENTER}`);
-                        await waitForPageEnter(`${KEY_ENTER}`);
-
+	
+                        await page.keyboard.press(keyDictionary[`\${KEY_ENTER}`]);
+                        //await waitForPageEnter(`${KEY_ENTER}`);
 	
                             selector = locatorToSelector(`//div[@id='sb_ifc52']/input`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='sb_ifc52']/input`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
-	selector = locatorToSelector(`//div[@id='sb_ifc52']/input`);
+	
+                        selector = locatorToSelector(`//div[@id='sb_ifc52']/input`);
                         container = await getContainer(selector);
                         await container.type(selector, `eureka, ca`);
-
-	await page.keyboard.sendCharacter(`${KEY_ENTER}`);
-                        await waitForPageEnter(`${KEY_ENTER}`);
-
+	
+                        await page.keyboard.press(keyDictionary[`\${KEY_ENTER}`]);
+                        //await waitForPageEnter(`${KEY_ENTER}`);
 	
                             selector = locatorToSelector(`//div[@id='omnibox-directions']/div/div[3]/button/div/div`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='omnibox-directions']/div/div[3]/button/div/div`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
-	selector = locatorToSelector(`//div[@id='sb_ifc53']/input`);
+	
+                        selector = locatorToSelector(`//div[@id='sb_ifc53']/input`);
                         container = await getContainer(selector);
                         await container.type(selector, `moose, canada`);
-
-	await page.keyboard.sendCharacter(`${KEY_ENTER}`);
-                        await waitForPageEnter(`${KEY_ENTER}`);
-
+	
+                        await page.keyboard.press(keyDictionary[`\${KEY_ENTER}`]);
+                        //await waitForPageEnter(`${KEY_ENTER}`);
 	
                             selector = locatorToSelector(`//div[@id='omnibox-directions']/div/div[2]/div/div/div[2]/div/div/button/div`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='omnibox-directions']/div/div[2]/div/div/div[2]/div/div/button/div`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='pane']/div/div/div/div/div[2]/button[2]/span`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='pane']/div/div/div/div/div[2]/button[2]/span`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='pane']/div/div/div/div/div[2]/div[2]/div/div[2]/div/span/label`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='pane']/div/div/div/div/div[2]/div[2]/div/div[2]/div/span/label`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='pane']/div/div/div/div/div[2]/button[2]/span[2]`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='pane']/div/div/div/div/div[2]/button[2]/span[2]`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='pane']/div/div/div/div/div[4]/div[2]/div[2]/button[2]`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='pane']/div/div/div/div/div[4]/div[2]/div[2]/button[2]`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='modal-dialog-widget']/div[2]/div/div[2]/button`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='modal-dialog-widget']/div[2]/div/div[2]/button`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='omnibox-directions']/div/div[2]/div/div/div[2]/div/div[2]/button/div`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='omnibox-directions']/div/div[2]/div/div/div[2]/div/div[2]/button/div`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='pane']/div/div[3]/button`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='pane']/div/div[3]/button`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//canvas[@id='']`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//canvas[@id='']`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='pane']/div/div[3]/button`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='pane']/div/div[3]/button`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='directions-searchbox-2']/button[2]/div`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='directions-searchbox-2']/button[2]/div`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='pane']/div/div/div/div/div[2]/button[2]/span`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='pane']/div/div/div/div/div[2]/button[2]/span`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='pane']/div/div/div/div/div[2]/button[2]/span[2]`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='pane']/div/div/div/div/div[2]/button[2]/span[2]`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='section-directions-trip-0']/div[2]/div[3]/div[2]/h1`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='section-directions-trip-0']/div[2]/div[3]/div[2]/h1`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='pane']/div/div/div/div/div[2]/div[3]/button`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='pane']/div/div/div/div/div[2]/div[3]/button`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='modal-dialog-widget']/div[2]/div/div[3]/div/div/div/div[4]/div[2]/div/button`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='modal-dialog-widget']/div[2]/div/div[3]/div/div/div/div[4]/div[2]/div/button`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='modal-dialog-widget']/div[2]/div/div[2]/button`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='modal-dialog-widget']/div[2]/div/div[2]/button`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//canvas[@id='']`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//canvas[@id='']`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//canvas[@id='']`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//canvas[@id='']`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='messages_container']/div[3]/div/div[2]/div/div[2]/div/div/div/div[12]/div`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='messages_container']/div[3]/div/div[2]/div/div[2]/div/div/div/div[12]/div`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`link=not-qa-repo`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`link=not-qa-repo`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='msg_input']/div/p`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='msg_input']/div/p`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
 	
                             selector = locatorToSelector(`//div[@id='messages_container']/div[3]/div/div[2]/div/div[2]/div/div/div/div[6]/div`);
                             container = await getContainer(selector);
                         try{
-                            await container.waitForSelector(selector);
-                            await delay (250);
-                            await container.click(selector);
+                            if(`//div[@id='messages_container']/div[3]/div/div[2]/div/div[2]/div/div/div/div[6]/div`.substring(0, 5) === "link=" ){
+                                await page.goto(selector);
+                            } else {
+                                await container.waitForSelector(selector);
+                                await delay (250);
+                                await container.click(selector);
+                            }   
                         }catch(error) {
+                            console.log(error);
                             container.mouse.down();
                         }
-
-
-    // helper function for enter button to wait
-    async function waitForPageEnter(value) {
-		console.log(value);
-		if(value === `${KEY_ENTER}`) {
-			await console.log("ya we waitin");
-			await page.waitForNavigation({ timeout: 4500 });
-		}
-
-    }
 
     await browser.close();
     
