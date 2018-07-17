@@ -209,7 +209,14 @@ var exportFunctions = {
 
     click: async function click(target) {
         var container = await getContainer(target);
-        var query = await container.waitForXPath(target, { timeout: 5000, visible: true });
+        var query;
+
+        try {
+            query = await container.waitForXPath(target, { timeout: 5000, visible: true });
+        } catch (error) {
+            query = await container.$x(target);
+        }
+
 
         //currently, Puppeteer's frame.click() does not support XPath, and frame.click() is what updates the page.
         //When the clicked element is a link, we must instead use goto because goto updates the page object.
@@ -221,8 +228,11 @@ var exportFunctions = {
             (r) => { return (r.method() === 'GET' && r.isNavigationRequest() && r.frame() === page.mainFrame()) },
             { timeout: 800 }
         );
-
-        await elementHandle.click();
+        try {
+            await elementHandle.click();
+        } catch (error) {
+            console.log(elementHandle);
+        }
 
         try {
             await navigation;
@@ -283,23 +293,23 @@ var exportFunctions = {
         await page.reload();
     },
 
-    selectFrame: async function selectFrame(value) {
+    selectFrame: async function selectFrame(target) {
         await page.waitFor(4000);
         var frames = await page.frames();
         tempContainer = page;
         //relative=top will change frame to top frame
-        if (value === 'relative=top') {
+        if (target === 'relative=top') {
             tempContainer = frames[lastIndex].parentFrame();
         }
         //index=x will change frame to frame x
-        else if (value.substring(0, 5) === 'index') {
-            var num = value.substring(6);
+        else if (target.substring(0, 5) === 'index') {
+            var num = target.substring(6);
             var index = parseInt(num);
             tempContainer = frames[index];
         }
         //finds frame through name and target
         else {
-            tempContainer = await frames.find(f => f.name() === value.substring(3, value.length));
+            tempContainer = await frames.find(f => f.name() === target.substring(3, target.length));
             //if it still hasn't found, set equal to last index used
             if (tempContainer === null) {
                 tempContainer = frames[lastIndex];
@@ -437,17 +447,19 @@ var exportFunctions = {
     },
 
     getContainer: async function getContainer(selector) {
-        var elementhandle = await page.$x(selector);
+        var query = await page.$x(selector);
+        var elementhandle = query.length === undefined ? query : query[0];
 
-        if (elementhandle) {
+        if (elementhandle && elementhandle.toString() !== undefined) { //added the toString check because .$x() returns [] if not found, not null/undefined
             return page;
         } else {
             var frames = await page.frames();
             var i, length = frames.length;
             for (i = 0; i < length; i++) {
-                elementhandle = await frames[i].$x(selector);
+                query = await frames[i].$x(selector);
+                elementhandle = query.length === undefined ? query : query[0];
 
-                if (elementhandle) {
+                if (elementhandle && elementhandle.toString() !== undefined) {
                     return frames[i];
                 }
             }
@@ -483,7 +495,11 @@ function locatorToSelector(target) {
     } else if (target.substring(0, 5) === "name=") {
         selector = "//*[@name=\"" + target.substring(5, target.length) + "\"]";
     } else if (target.substring(0, 5) === "link=") {
-        selector = "//a[contains(text(),'" + target.substring(5, target.length) + "')]";
+        var offset = 5;
+        if(target.substring(5, 11) == 'exact:') {
+            offset = 11
+        }
+        selector = "//a[contains(text(),'" + target.substring(offset, target.length) + "')]";
     } else if (target.substring(0, 11) === "identifier=") {
         selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
     } else if (target.substring(0, 4) === "css=") {
@@ -492,6 +508,8 @@ function locatorToSelector(target) {
         throw new Error("The 'ui=' locator is not supported.");
     } else if (target.substring(0, 4) === "dom=") {
         throw new Error("The 'dom=' locator is not supported.");
+    } else if (target.substring(0, 6) === "xpath=") {
+        selector = target.substring(6, target.length);
     }
 
     return selector;
@@ -524,8 +542,8 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "echo": (x) => `await echo(\`${locatorToSelector(x.target)}\`, \`${x.value}\`);\n`,
                     "get": (x) => `await get(\`${x.target}\`);\n`,
                     "comment": (x) => `//${x.target}\n`,
-                    "sendkeys": (x) => `await sendKeys(keyDictionary['${x.value}']);\n`,
-                    "selectframe": (x) => `await selectFrame(\`${x.value}\`);\n`,
+                    "sendkeys": (x) => `await sendKeys(keyDictionary['${x.target}']);\n`,
+                    "selectframe": (x) => `await selectFrame(\`${x.target}\`);\n`,
                     "assertalert": (x) => `await assertAlert(\`${x.target}\`);\n`,
                     "asserttext": (x) => `await assertText(\`${locatorToSelector(x.target)}\`, \`${x.value}\`);\n`,
                     "asserttitle": (x) => `await assertTitle(\`${x.value}\`);\n`,
