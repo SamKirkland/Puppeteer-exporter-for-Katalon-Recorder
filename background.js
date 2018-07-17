@@ -106,6 +106,396 @@ let F12 = "\uE03C";
 let META = "\uE03D"; let COMMAND = META;
 */
 
+var exportFunctions = {
+
+    assertAlert: async function assertAlert(target) {
+        try {
+            await assertionHelper(target, `/alert\\(['"]([^'"]+)['"]\\)/`);
+            console.log("Target: '" + target + "' found.");
+        } catch (error) {
+            console.log("Confirmation message not found.");
+        }
+    },
+
+    assertElementPresent: async function assertElementPresent(target) {
+        if (await getContainer(target)) {
+            console.log("assertElementPresent PASSED.");
+        } else {
+            throw ("assertElementPresent FAILED. Element not found.");
+            process.exit();
+        }
+    },
+
+    assertPrompt: async function assertPrompt(target) {
+        try {
+            await assertionHelper(target, `prompt\\(['"]([^'"]+)['"]`);
+            console.log("Target: '" + target + "' found.");
+        } catch (error) {
+            console.log("Prompt message not found.");
+        }
+    },
+
+    assertText: async function assertText(target, value) {
+        var property;
+        try {
+            var container = await getContainer(target);
+            const elementHandle = await container.waitForXPath(target);
+            const jshandle = await elementHandle.getProperty('text');
+            property = await jshandle.jsonValue();
+        } catch (err) {
+            throw ("assertText FAILED. Unable to retreive element or property. Error message:\n" + err);
+            process.exit();
+        }
+
+        if (property === value) {
+            console.log("assertText PASSED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+        } else {
+            throw ("assertText FAILED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+            process.exit();
+        }
+    },
+
+    assertTitle: async function assertTitle(value) {
+        var title;
+        try {
+            title = await page.title();
+        } catch (err) {
+            throw ("verifyTitle FAILED. Could not retreive title. Error message:\n" + err);
+            process.exit();
+        }
+
+        if (title === value) {
+            console.log("assertTitle PASSED. Actual value = '" + title + "'. Given value = '" + value + "'.");
+        } else {
+            throw "assertTitle FAILED. Actual value = '" + title + "'. Given value = '" + value + "'.";
+            process.exit();
+        }
+    },
+
+    assertValue: async function assertValue(target, value) {
+        var property;
+        try {
+            var container = await getContainer(target);
+            const elementHandle = await container.waitForXPath(target);
+            const jshandle = await elementHandle.getProperty('value');
+            property = await jshandle.jsonValue();
+        } catch (err) {
+            throw ("assertValue FAILED. Unable to retreive element or property. Error message:\n" + err);
+            process.exit();
+        }
+
+        if (property === value) {
+            console.log("assertValue PASSED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+        } else {
+            throw "assertValue FAILED. Actual value = '" + property + "'. Given value = '" + value + "'.";
+            process.exit();
+        }
+    },
+
+    bringBrowserToForground: async function bringBrowserToForground() {
+        await page.bringToFront();
+    },
+
+    captureScreenshot: async function captureScreenshot(target) {
+        let name = target + ".jpg";
+        await page.goto(page.url());
+        await page.screenshot({ path: name });
+    },
+
+    captureEntirePageScreenshot: async function captureEntirePageScreenshot(target) {
+        let name = target + ".jpg";
+        await page.screenshot({ path: name, fullPage: true });
+    },
+
+    click: async function click(target) {
+        var container = await getContainer(target);
+        var query = await container.waitForXPath(target, { timeout: 5000, visible: true });
+
+        //currently, Puppeteer's frame.click() does not support XPath, and frame.click() is what updates the page.
+        //When the clicked element is a link, we must instead use goto because goto updates the page object.
+        var elementHandle = query.length === undefined ? query : query[0];
+        var taghandle = await elementHandle.getProperty('tagName');
+        var tag = await taghandle.jsonValue().toString().toLowerCase();
+
+        var navigation = page.waitForRequest(
+            (r) => { return (r.method() === 'GET' && r.isNavigationRequest() && r.frame() === page.mainFrame()) },
+            { timeout: 800 }
+        );
+
+        await elementHandle.click();
+
+        try {
+            await navigation;
+        } catch (error) {
+            return;
+        }
+
+        await page.waitForNavigation({ waitUntil: 'load' });
+    },
+
+    deleteAllVisibleCookies: async function deleteAllVisibleCookies() {
+        for (var i = 0; i < browserTabs.length; i++) {
+            await browserTabs[i]._client.send('Network.clearBrowserCookies');
+        }
+    },
+
+    echo: async function echo(target, value) {
+        var container;
+        if (value !== "#shownotification") {
+            container = await getContainer(target);
+        } else {
+            container = page;
+        }
+
+        if (container.evaluate('Notification.permission !== "granted"') && value === "#shownotification") {
+            await container.evaluate('Notification.requestPermission()');
+            await container.evaluate(t => {
+                new Notification('Notification title', { body: t });
+            }, target);
+        } else if (value === "#shownotification") { //notification access already granted.
+            await container.evaluate(t => {
+                new Notification('Notification title', { body: t });
+            }, target);
+        }
+    },
+
+    get: async function get(target) {
+        await page.goto(target);
+    },
+
+    mouseOver: async function mouseOver(target) {
+        var container = await getContainer(target);
+        await container.hover(target);
+    },
+
+    /**
+    * @param target is the url to which the page should navigate.
+    */
+    open: async function open(target) {
+        await page.goto(target);
+    },
+
+    pause: async function pause(target) {
+        await page.waitFor(parseInt(target));
+    },
+
+    refresh: async function refresh() {
+        await page.reload();
+    },
+
+    selectFrame: async function selectFrame(value) {
+        await page.waitFor(4000);
+        var frames = await page.frames();
+        tempContainer = page;
+        //relative=top will change frame to top frame
+        if (value === 'relative=top') {
+            tempContainer = frames[lastIndex].parentFrame();
+        }
+        //index=x will change frame to frame x
+        else if (value.substring(0, 5) === 'index') {
+            var num = value.substring(6);
+            var index = parseInt(num);
+            tempContainer = frames[index];
+        }
+        //finds frame through name and target
+        else {
+            tempContainer = await frames.find(f => f.name() === value.substring(3, value.length));
+            //if it still hasn't found, set equal to last index used
+            if (tempContainer === null) {
+                tempContainer = frames[lastIndex];
+            }
+        }
+    },
+
+    selectWindow: async function selectWindow(target, value) {
+        if (target.substring(9) === 'local') {
+            await browserTabs[0].bringToFront();
+            page = browserTabs[0];
+            await page.waitFor(1000);
+        } else if (target.substring(9) > browserTabs.length) {
+            var newTab = await page.browser().newPage();
+            await newTab.setViewport(page.viewport());
+            await newTab.goto(value, { waitUntil: 'networkidle2' });
+            await newTab.bringToFront();
+            await browserTabs.push(newTab);
+            page = newTab;
+        } else if (parseInt(target.substring(9)) >= 0) {
+            var goto = parseInt(target.substring(9));
+            await browserTabs[goto].bringToFront();
+            page = browserTabs[goto];
+            await page.waitFor(1000);
+        }
+    },
+
+    sendKeys: async function sendKeys(value) {
+        var navigation = page.waitForRequest(
+            (r) => { return (r.method() === 'GET' && r.isNavigationRequest() && r.frame() === page.mainFrame()) },
+            { timeout: 800 }
+        );
+
+        await page.keyboard.press(value);
+
+        try {
+            await navigation;
+        } catch (error) {
+            return;
+        }
+
+        await page.waitForNavigation({ waitUntil: 'load' });
+    },
+
+    type: async function type(target, value) {
+        var container = await getContainer(target);
+        const elementHandle = await container.waitForXPath(target);
+        await elementHandle.type(value);
+    },
+
+    verifyChecked: async function verifyChecked(target) {
+        var property;
+        try {
+            var container = await getContainer(target);
+            const elementHandle = await container.waitForXPath(target);
+            const jshandle = await elementHandle.getProperty('checked');
+            property = await jshandle.jsonValue();
+        } catch (err) {
+            return console.log("verifyChecked FAILED. Unable to retreive element or property. Error message:\n" + err);
+        }
+
+        if (property) {
+            console.log("verifyChecked PASSED. Element is checked.");
+        } else {
+            console.log("verifyChecked FAILED. Element is unchecked.");
+        }
+    },
+
+    verifyElementPresent: async function verifyElementPresent(target) {
+        if (await getContainer(target)) {
+            console.log("verifyElementPresent PASSED.");
+        } else {
+            console.log("verifyElementPresent FAILED. Element not found.");
+        }
+    },
+
+    verifyText: async function verifyText(target, value) {
+        var property;
+        try {
+            var container = await getContainer(target);
+            const elementHandle = await container.waitForXPath(target);
+            const jshandle = await elementHandle.getProperty('text');
+            property = await jshandle.jsonValue();
+        } catch (err) {
+            return console.log("verifyText FAILED. Unable to retreive element or property. Error message:\n" + err);
+        }
+
+        if (property === value) {
+            console.log("verifyText PASSED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+        } else {
+            console.log("verifyText FAILED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+        }
+    },
+
+    verifyTitle: async function verifyTitle(value) {
+        var title;
+        try {
+            title = await page.title();
+        } catch (err) {
+            return console.log("verifyTitle FAILED. Could not retreive title. Error message:\n" + err);
+        }
+
+        if (title === value) {
+            console.log("verifyTitle PASSED. Actual value = '" + title + "'. Given value = '" + value + "'.");
+        } else {
+            console.log("verifyTitle FAILED. Actual value = '" + title + "'. Given value = '" + value + "'.");
+        }
+    },
+
+    verifyValue: async function verifyValue(target, value) {
+        var property;
+        try {
+            var container = await getContainer(target);
+            const elementHandle = await container.waitForXPath(target);
+            const jshandle = await elementHandle.getProperty('value');
+            property = await jshandle.jsonValue();
+        } catch (err) {
+            return console.log("verifyValue FAILED. Unable to retreive element or property. Error message:\n" + err);
+        }
+
+        if (property === value) {
+            console.log("verifyValue PASSED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+        } else {
+            console.log("verifyValue FAILED. Actual value = '" + property + "'. Given value = '" + value + "'.");
+        }
+    },
+
+    waitForPageToLoad: async function waitForPageToLoad() {
+        while (await page.evaluate('document.readyState !== \'complete\';'));
+    },
+
+    waitForVisible: async function waitForVisible(target) {
+        var container = await getContainer(target);
+        return await container.waitForXPath(target, { visible: true });
+    },
+
+    getContainer: async function getContainer(selector) {
+        var elementhandle = await page.$x(selector);
+
+        if (elementhandle) {
+            return page;
+        } else {
+            var frames = await page.frames();
+            var i, length = frames.length;
+            for (i = 0; i < length; i++) {
+                elementhandle = await frames[i].$x(selector);
+
+                if (elementhandle) {
+                    return frames[i];
+                }
+            }
+        }
+        return null;
+    },
+
+    assertionHelper: async function assertionHelper(target, regex) {
+        await page.evaluate((t, r) => {
+            var elem = document.scripts;
+            var reg = new RegExp(r);
+            for (var i = 0; i < elem.length; i++) {
+                var txt = elem[i].textContent.match(reg);
+                if (txt) {
+                    var checkText = txt[1].replace('\\\\n', '\\n');
+                    if (checkText === t) {
+                        break;
+                    }
+                }
+                if (i >= elem.length - 1) {
+                    throw "Confirmation message not found.";
+                }
+            }
+        }, target, regex);
+    },
+};
+
+function locatorToSelector(target) {
+    var selector = target;
+
+    if (target.substring(0, 3) === "id=") {
+        selector = "//*[@id=\"" + target.substring(3, target.length) + "\"]";
+    } else if (target.substring(0, 5) === "name=") {
+        selector = "//*[@name=\"" + target.substring(5, target.length) + "\"]";
+    } else if (target.substring(0, 5) === "link=") {
+        selector = "//a[contains(text(),'" + target.substring(5, target.length) + "')]";
+    } else if (target.substring(0, 11) === "identifier=") {
+        selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
+    } else if (target.substring(0, 4) === "css=") {
+        //selector = target.substring(4, target.length);
+    } else if (target.substring(0, 3) === "ui=") {
+        throw new Error("The 'ui=' locator is not supported.");
+    } else if (target.substring(0, 4) === "dom=") {
+        throw new Error("The 'dom=' locator is not supported.");
+    }
+
+    return selector;
+}
 
 chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResponse) {
     if (message.type === 'katalon_recorder_export') {
@@ -115,550 +505,106 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
         var extension = '';
         var mimetype = '';
 
-    switch (payload.capabilityId) {
-        case 'puppeteer':
-            debugger;
-        case 'puppeteerBT':
-            debugger;
-        case 'puppeteerShared':
-            seleniumToPuppeteer = {
-    "open": (x) => `\tawait page.goto('${x.target}');\n`,
-    "click": (x) => `
-        try {
-            await delay(2000);
-            syncSelector = locatorToSyncSelector(\`${x.target}\`);
-            container = await getContainer(syncSelector, page);
-            await container.waitForSelector(syncSelector, { timeout: 5000, visible: true });
-            await container.click(syncSelector);
-        } catch (error) {
-            try {
-                selector = await locatorToSelector(\`${x.target}\`);
-                await container.waitForSelector(selector, { timeout: 5000, visible: true });
-                container = await getContainer(selector, page);
-                await container.waitFor(500);
-
-                var isALink = await container.evaluate((s) => {
-                    var element = document.querySelector(s);
-                    var tag = element.tagName.toLowerCase();
-                    var href = element.href;
-                    return (href !== undefined && href !== "" && tag === 'a');
-                }, selector);
-
-                if (isALink) {
-                    const elementHandle = await container.waitForSelector(selector);
-                    const jshandle = await elementHandle.getProperty('href');
-                    property = await jshandle.jsonValue();
-                    await page.goto(property);
-                } else {
-                    try {
-                        await container.click(selector);
-                    } catch (error) {
-                        await container.evaluate((s) => {
-                            document.querySelector(s).click();
-                        }, selector);
-                    }
+        switch (payload.capabilityId) {
+            case 'puppeteerBT':
+            case 'puppeteer':
+                seleniumToPuppeteer = {
+                    "open": (x) => `await open(\`${x.target}\`);\n`,
+                    "click": (x) => `await click(\`${locatorToSelector(x.target)}\`);\n`,
+                    "store": (x) => `await let ${x.target} = ${x.value};\n`,
+                    "type": (x) => `await type(\`${locatorToSelector(x.target)}\`, \`${x.value}\`);\n`,
+                    "capturescreenshot": (x) => `await captureScreenshot(\`${x.target}\`);\n`,
+                    "pause": (x) => `await pause('${x.target}');\n`,
+                    "mouseOver": (x) => `await mouseOver(\`${locatorToSelector(x.target)}\`);\n`,
+                    "deleteallvisiblecookies": (x) => `await deleteAllVisibleCookies();\n`,
+                    "captureentirepagescreenshot": (x) => `await captureEntirePageScreenshot(\`${x.target}\`);\n`,
+                    "bringbrowsertoforeground": (x) => `await bringBrowserToForeground();\n`,
+                    "refresh": (x) => `await refresh();\n`,
+                    "selectwindow": (x) => `await selectWindow(\`${x.target}\`, \`${x.value}\`);\n`,
+                    "echo": (x) => `await echo(\`${locatorToSelector(x.target)}\`, \`${x.value}\`);\n`,
+                    "get": (x) => `await get(\`${x.target}\`);\n`,
+                    "comment": (x) => `//${x.target}\n`,
+                    "sendkeys": (x) => `await sendKeys(keyDictionary['${x.value}']);\n`,
+                    "selectframe": (x) => `await selectFrame(\`${x.value}\`);\n`,
+                    "assertalert": (x) => `await assertAlert(\`${x.target}\`);\n`,
+                    "asserttext": (x) => `await assertText(\`${locatorToSelector(x.target)}\`, \`${x.value}\`);\n`,
+                    "asserttitle": (x) => `await assertTitle(\`${x.value}\`);\n`,
+                    "assertprompt": (x) => `await assertPrompt(\`${x.target}\`);\n`,
+                    "assertelementpresent": (x) => `await assertElementPresent(\`${locatorToSelector(x.target)}\`);\n`,
+                    "assertvalue": (x) => `await assertValue(\`${locatorToSelector(x.target)}\`, \`${x.value}\`);\n`,
+                    "verifychecked": (x) => `await verifyChecked(\`${locatorToSelector(x.target)}\`);\n`,
+                    "verifyelementpresent": (x) => `await verifyElementPresent(\`${locatorToSelector(x.target)}\`);\n`,
+                    "verifytext": (x) => `await verifyText(\`${locatorToSelector(x.target)}\`, \`${x.value}\`);\n`,
+                    "verifytitle": (x) => `await verifyTitle(\`${x.value}\`);\n`,
+                    "verifyvalue": (x) => `await verifyValue(\`${locatorToSelector(x.target)}\`, \`${x.value}\`);\n`,
+                    "waitforpagetoload": (x) => `await waitForPageToLoad();\n`,
+                    "waitforvisible": (x) => `await waitForVisible(\`${locatorToSelector(x.target)}\`);\n`
                 }
-            } catch (error) {
-                await tempContainer.click(selector);
-            }
+                //commands that can cause navigation:
+                //open, click, get, sendkeys
 
-        }`,                        
-    "store": (x) => `\tlet ${x.target} = ${x.value};\n`,
-    "type": (x) => `
-        try {
-            selector = locatorToSyncSelector(\`${x.target}\`);
-            container = await getContainer(selector);
-            await container.type(selector, \`${x.value}\`);
-        } catch (error) {
-            selector = await locatorToSelector(\`${x.target}\`);
-            container = await getContainer(selector);
-            await container.type(selector, \`${x.value}\`);
-        }`,        
-    "get": (x) => `\tawait page.goto('${x.target}');\n`,
-    "comment": (x) => `\t// ${x.target}\n`,
-    "sendkeys": (x) => `
-        await delay(500);
-        await page.keyboard.press(keyDictionary[\`\\${x.value}\`]);`,
-    "selectframe": (x) => `
-        await delay(4000);
-        var frames = await page.frames();
-        var tempContainer = page;
-        //relative=top will change frame to top frame
-        if (\`${x.value}\` === 'relative=top') {
-            tempContainer = frames[lastIndex].parentFrame();
-        }
-        //index=x will change frame to frame x
-        else if (\`${x.value}\`.substring(0, 5) === 'index') {
-            var num = \`${x.value}\`.substring(6);
-            var index = parseInt(num);
-            tempContainer = frames[index];
-        }
-        //finds frame through name and target
-        else {
-            tempContainer = await frames.find(f => f.name() === \`${x.value}\`.substring(3, \`${x.value}\`.length));
-            //if it still hasn't found, set equal to last index used
-            if (tempContainer === null) {
-                tempContainer = frames[lastIndex];
-            }
-        }`,                    
-    "captureScreenshot": (x) => `
-        let name = ${x.target} + ".jpg";
-        await page.goto(page.url());
-        await page.screenshot({ path: name });`,                
-    "captureEntirePageScreenshot": (x) => `
-        let name = ${x.target} + ".jpg";
-        await page.screenshot({ path: name, fullPage: true });`,                
-    "bringBrowserToForeground": (x) => `\tawait page.bringToFront();\n`,
-    "refresh": (x) => `\tawait page.reload();\n`,
-    "selectWindow": (x) => `
-        if (${x.target}.substring(9) === 'local') {
-            await browserTabs[0].bringToFront();
-            page = browserTabs[0];
-            await page.waitFor(1000);
-        } else if (${x.target}.substring(9) > browserTabs.length) {
-            var newTab = await page.browser().newPage();
-            await newTab.setViewport(page.viewport());
-            await newTab.goto(${x.value}, { waitUntil: 'networkidle2' });
-            await newTab.bringToFront();
-            await browserTabs.push(newTab);
-            page = newTab;
-        } else if (parseInt(${x.target}.substring(9)) >= 0) {
-            var goto = parseInt(target.substring(9));
-            await browserTabs[goto].bringToFront();
-            page = browserTabs[goto];
-            await page.waitFor(1000);
-        }`,            
-    "pause": (x) => `\tawait page.waitFor(parseInt(${x.target}));\n`,
-    "mouseOver": (x) => `
-        var path = await locatorToSelector(${x.target});
-        var container = await getContainer(path);
-        await container.hover(path);`,                
-    "deleteAllVisibleCookies": (x) => `
-        for (var i = 0; i < browserTabs.length; i++) {
-        await browserTabs[i]._client.send('Network.clearBrowserCookies');
-    }`,
-    "echo": (x) => `
-        var path, container;
-        if (value !== "#shownotification") {
-            path = await locatorToSelector(${x.target});
-            container = await getContainer(path);
-        } else {
-            container = page;
-        }
+                //needs to determine if navigation has happened, update page, wait for load
+                if (payload.capabilityId === 'puppeteerBT') {
+                    //ex seleniumToPuppeteer[command] = `new instructions;`;
+                }
 
-        if (container.evaluate('Notification.permission !== "granted"') && value === "#shownotification") {
-            await container.evaluate('Notification.requestPermission()');
-            await container.evaluate(t => {
-                new Notification('Notification title', { body: t });
-            }, ${x.target});
-        } else if (value === "#shownotification") { //notification access already granted.
-            await container.evaluate(t => {
-                new Notification('Notification title', { body: t });
-            }, ${x.target});
-        }`,            
-    "assertAlert": (x) => `
-        try {
-            await assertionHelper(${x.target}, \`/alert\\(['"]([^'"]+)['"]\\)/\`);
-            console.log("Target: '" + ${x.target} + "' found.");
-        } catch (error) {
-            console.log("Confirmation message not found.");
-        }`,                                    
-    "assertText": (x) => `
-        var property;
-        try {
-            var selector = await locatorToSelector(${x.target});
-            var container = await getContainer(selector);
-            const elementHandle = await container.waitForSelector(selector);
-            const jshandle = await elementHandle.getProperty('text');
-            property = await jshandle.jsonValue();
-        } catch (err) {
-            throw ("assertText FAILED. Unable to retreive element or property. Error message:\n" + err);
-            process.exit();
-        }
-    
-        if (property === ${x.value}) {
-            console.log("assertText PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-        } else {
-            throw ("assertText FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-            process.exit();
-        }`,
-                                        
-    "assertTitle": (x) => `
-        var title;
-        try {
-            title = await page.title();
-        } catch (err) {
-            throw ("verifyTitle FAILED. Could not retreive title. Error message:\n" + err);
-            process.exit();
-        }
-    
-        if (title === ${x.value}) {
-            console.log("assertTitle PASSED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.");
-        } else {
-            throw "assertTitle FAILED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.";
-            process.exit();
-        }`,
-                                        
-    "assertElementPresent": (x) => `
-        var selector = await locatorToSelector(${x.target});
-        if (await elementExists(selector)) {
-            console.log("assertElementPresent PASSED.");
-        } else {
-            throw ("assertElementPresent FAILED. Element not found.");
-            process.exit();
-        }`,
-                                                
-    "assertPrompt": (x) => `
-        try {
-            await assertionHelper(target, \`prompt\\(['"]([^'"]+)['"]\`);
-            console.log("Target: '" + target + "' found.");
-        } catch (error) {
-            console.log("Prompt message not found.");
-        }`,                                
-    "assertValue": (x) => `
-        var property;
-        try {
-            var selector = await locatorToSelector(${x.target});
-            var container = await getContainer(selector);
-            const elementHandle = await container.waitForSelector(selector);
-            const jshandle = await elementHandle.getProperty('value');
-            property = await jshandle.jsonValue();
-        } catch (err) {
-            throw ("assertValue FAILED. Unable to retreive element or property. Error message:\n" + err);
-            process.exit();
-        }
-    
-        if (property === ${x.value}) {
-            console.log("assertValue PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-        } else {
-            throw "assertValue FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.";
-            process.exit();
-        }`,
-                                        
-    "verifyChecked": (x) => `
-        var property;
-        try {
-            var selector = await locatorToSelector(${x.target});
-            var container = await getContainer(selector);
-            const elementHandle = await container.waitForSelector(selector);
-            const jshandle = await elementHandle.getProperty('checked');
-            property = await jshandle.jsonValue();
-        } catch (err) {
-            return console.log("verifyChecked FAILED. Unable to retreive element or property. Error message:\n" + err);
-        }
-    
-        if (property) {
-            console.log("verifyChecked PASSED. Element is checked.");
-        } else {
-            console.log("verifyChecked FAILED. Element is unchecked.");
-        }`,                                        
-    "verifyElementPresent": (x) => `
-        var selector = await locatorToSelector(${x.target});
-        if (await elementExists(selector)) {
-            console.log("verifyElementPresent PASSED.");
-        } else {
-            console.log("verifyElementPresent FAILED. Element not found.");
-        }`,            
-    "verifyText": (x) => `
-        var property;
-        try {
-            var selector = await locatorToSelector(${x.target});
-            var container = await getContainer(selector);
-            const elementHandle = await container.waitForSelector(selector);
-            const jshandle = await elementHandle.getProperty('text');
-            property = await jshandle.jsonValue();
-        } catch (err) {
-            return console.log("verifyText FAILED. Unable to retreive element or property. Error message:\n" + err);
-        }
-    
-        if (property === ${x.value}) {
-            console.log("verifyText PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-        } else {
-            console.log("verifyText FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-        }`,
-                                        
-    "verifyTitle": (x) => `
-        var title;
-        try {
-            title = await page.title();
-        } catch (err) {
-            return console.log("verifyTitle FAILED. Could not retreive title. Error message:\n" + err);
-        }
-    
-        if (title === ${x.value}) {
-            console.log("verifyTitle PASSED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.");
-        } else {
-            console.log("verifyTitle FAILED. Actual value = '" + title + "'. Given value = '" + ${x.value} + "'.");
-        }`,
-                                        
-    "verifyValue": (x) => `
-        var property;
-        try {
-            var selector = await locatorToSelector(${x.target});
-            var container = await getContainer(selector);
-            const elementHandle = await container.waitForSelector(selector);
-            const jshandle = await elementHandle.getProperty('value');
-            property = await jshandle.jsonValue();
-        } catch (err) {
-            return console.log("verifyValue FAILED. Unable to retreive element or property. Error message:\n" + err);
-        }
-    
-        if (property === ${x.value}) {
-            console.log("verifyValue PASSED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-        } else {
-            console.log("verifyValue FAILED. Actual value = '" + property + "'. Given value = '" + ${x.value} + "'.");
-        }`,                            
-                                        
-    "waitForPageToLoad": (x) => `\twhile (await page.evaluate('document.readyState !== \'complete\';'));\n`,
-    "waitForVisible": (x) => `
-        var selector = await locatorToSelector(${x.target}); 
-        var container = await getContainer(selector); 
-        return await container.waitForSelector(selector, { visible: true });`
-    }
+                let convertedCommands = commands.map((c) => {
+                    let equivCommand = seleniumToPuppeteer[c.command.toLowerCase()];
 
-    if (payload.capabilityId === 'puppeteerBT') {
-        //ex seleniumToPuppeteer[command] = `new instructions;`;
-    }           
-    let convertedCommands = commands.map((c) => {
-        let equivCommand = seleniumToPuppeteer[c.command.toLowerCase()];
+                    if (typeof equivCommand === "function") {
+                        return equivCommand(c);
+                    }
+                    //return `alert('Command "${c.command.toLowerCase()}" not supported');`; //, ${c.target}', '${x.value}');`;
+                });
 
-        if (typeof equivCommand === "function") {
-            return equivCommand(c);
-        }
-        //return `alert('Command "${c.command.toLowerCase()}" not supported');`; //, ${c.target}', '${x.value}');`;
-    });
-                
 
                 content =
                     `const puppeteer = require('puppeteer');
-const xpath2css = require('xpath2css');
-const delay = require('delay');
 // built in selenium vars
 // https://github.com/Jongkeun/selenium-ide/blob/6d18a36991a9541ab3e9cad50c2023b0680e497b/packages/selenium-ide/src/content/selenium-api.js
-let KEY_BACKSPACE = "\\uE003"; let KEY_BKSP = KEY_BACKSPACE;
-let KEY_TAB = "\\uE004";
-let KEY_ENTER = "\\uE007";
-let KEY_SHIFT = "\\uE008";
-let KEY_ESC = "\\uE00C"; let KEY_ESCAPE = KEY_ESC;
-let KEY_DELETE = "\\uE017"; let KEY_DEL = KEY_DELETE;
-var page;
-
-async function getContainer(selector) {
-    //returns previous index if not found
-    var elementhandle = await page.$(selector);
-
-    if (elementhandle) {
-        return page;
-    } else {
-        var frames = await page.frames();
-        var i, length = frames.length;
-        for (i = 0; i < length; i++) {
-            elementhandle = await frames[i].$(selector);
-
-            if (elementhandle) {
-                return frames[i];
-            } else if (i === length - 1) {
-                return frames[length - 1];
-            }
-        }
-    }
-}
-
-function locatorToSyncSelector(target) {
-    var selector;
-
-    if (target.substring(0, 1) === "/" || target.substring(0, 6) === "xpath=") {
-        if (target.indexOf('@') != target.lastIndexOf('@')) {
-            var attributeSelector = target.substring(target.lastIndexOf('@'), target.length);
-            target = target.substring(0, target.lastIndexOf('@'));
-            selector = xpath2css(target);
-            selector += attributeSelector;
-        } else {
-            selector = xpath2css(target);
-        }
-    } else if (target.substring(0, 3) === "id=") {
-        selector = "[id=" + target.substring(3, target.length) + "]";
-    } else if (target.substring(0, 5) === "name=") {
-        selector = "//input[@name=" + target.substring(5, target.length) + "]";
-        selector = xpath2css(selector);
-    } else if (target.substring(0, 5) === "link=") {
-        selector = "//a[contains(text(),'" + target.substring(5, target.length) + "')]";
-        selector = xpath2css(selector);
-    } else if (target.substring(0, 11) === "identifier=") {
-        selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
-    } else if (target.substring(0, 4) === "dom=") {
-        //TODO
-    } else if (target.substring(0, 4) === "css=") {
-        selector = target.substring(4, target.length);
-    } else if (target.substring(0, 3) === "ui=") {
-        //TODO
-    } else {
-        selector = target;
-    }
-
-    return selector;
-}
-async function locatorToSelector(target) {
-    var selector;
-    await delay(1000);
-    await page.addScriptTag({ url: 'https://code.jquery.com/jquery-3.2.1.min.js' });
-    if (target.substring(0, 1) === "/" || target.substring(0, 6) === "xpath=") {
-        if (target.indexOf('@') != target.lastIndexOf('@')) {
-            var attributeSelector =  await target.substring(target.lastIndexOf('@'), target.length);
-            target = await target.substring(0, target.lastIndexOf('@'));
-            selector = await xpath2css(target);
-            selector += attributeSelector;
-        } else {
-            selector = await xpath2css(target);
-        }
-    } else if (target.substring(0, 3) === "id=") {
-        selector = "//[@id=" + await target.substring(3, target.length) + "]";
-        selector =  await xpath2css(selector);
-    } else if (target.substring(0, 5) === "name=") {
-        selector = "//input[@name=" + await target.substring(5, target.length) + "]";
-        selector = await xpath2css(selector);      
-    } else if (target.substring(0, 5) === "link=") {
-        selector = "//a[contains(text(),'" + await target.substring(5, target.length) + "')]";
-        selector =  await xpath2css(selector);
-    } else if (target.substring(0, 11) === "identifier=") {
-        selector = "[name=" +  await target.substring(11, target.length) + "],[id=" + await target.substring(11, target.length) + "]";
-    } else if (target.substring(0, 4) === "dom=") {
-        //TODO
-    } else if (target.substring(0, 4) === "css=") {
-        selector = await target.substring(4, target.length);
-    } else if (target.substring(0, 3) === "ui=") {
-        //TODO
-    } else {
-        selector = target;
-    }
-    selector = await page.evaluate((s) => {
-        console.log('test');
-        jQuery.fn.extend({
-            getPath: function () {
-                var path, node = this;
-                while (node.length) {
-                    var realNode = node[0], name = realNode.localName;
-                    if (!name) break;
-                    name = name.toLowerCase();
-
-                    var parent = node.parent();
-                    var sameTagSiblings = parent.children(name);
-                    if (sameTagSiblings.length > 1) {
-                        allSiblings = parent.children();
-                        var index = allSiblings.index(realNode) + 1;
-                        if (index > 1) {
-                            name += ':nth-child(' + index + ')';
-                        }
-                    }
-
-                    path = name + (path ? '>' + path : '');
-                    node = parent;
-                }
-                return path;
-            }
-        });
-        var element = $(s);
-        return (element.getPath());
-
-    }, selector);
-    return selector;
-}
-
-async function elementExists(selector) {
-    try {
-        var elementhandle = await page.$(selector);
-
-        if (elementhandle) {
-            return true;
-        } else {
-            var frames = await page.frames();
-            var i, length = frames.length;
-            for (i = 0; i < length; i++) {
-                elementhandle = await frames[i].$(selector);
-
-                if (elementhandle) {
-                    return true;
-                }
-            }
-        }
-    } catch (err) {
-        return false;
-    }
-    return false;
-}
-
-var keyDictionary = {
-    '\${KEY_LEFT}': 'ArrowLeft',
-    '\${KEY_UP}': 'ArrowUp',
-    '\${KEY_RIGHT}': 'ArrowRight',
-    '\${KEY_DOWN}': 'ArrowDown',
-    '\${KEY_PGUP}': 'PageUp',
-    '\${KEY_PAGE_UP}': 'PageUp',
-    '\${KEY_PGDN}': 'PageDown',
-    '\${KEY_PAGE_DOWN}': 'PageDown',
-    '\${KEY_BKSP}': 'Backspace',
-    '\${KEY_BACKSPACE}': 'Backspace',
-    '\${KEY_DEL}': 'Delete',
-    '\${KEY_DELETE}': 'Delete',
-    '\${KEY_ENTER}': 'Enter',
-    '\${KEY_TAB}': 'Tab',
-    '\${KEY_HOME}': 'Home'
-};
-
-async function assertionHelper(target, regex) {
-    await page.evaluate((t, r) => {
-        var elem = document.scripts;
-        var reg = new RegExp(r);
-        for (var i = 0; i < elem.length; i++) {
-            var txt = elem[i].textContent.match(reg);
-            if (txt) {
-                var checkText = txt[1].replace('\\\\n', '\\n');
-                if (checkText === t) {
-                    break;
-                }
-            }
-            if (i >= elem.length - 1) {
-                throw "Confirmation message not found.";
-            }
-        }
-    }, target, regex);
-}
 
 (async () => {
-	let browser = await puppeteer.launch({headless: false, args:['--start-maximized']});
-    var initPage = await browser.newPage();
-    page = initPage;
+    let browser = await puppeteer.launch({ headless: false, args: ['--start-maximized'] });
+    var page = await browser.newPage();
     var tempContainer = page;
-    var selector = null;
-    var container = null;
     var lastIndex = 0;
     await page._client.send('Emulation.clearDeviceMetricsOverride');
-
-    var winWidth = await page.evaluate(
-        async () => {
-            return await window.innerWidth;
-        }
-    );
-    var winHeight = await page.evaluate(
-        async () => {
-            return await window.innerHeight;
-        }
-    );
+    var winWidth = await page.evaluate(async () => { return await window.innerWidth; });
+    var winHeight = await page.evaluate(async () => { return await window.innerHeight; });
     await page.setViewport({ width: winWidth, height: winHeight });
+    var browserTabs = [page];
 
-    var browserTabs = await [];
-    await browserTabs.push(page);
-    await delay(2000);
+    var keyDictionary = {
+        '\${KEY_LEFT}': 'ArrowLeft',
+        '\${KEY_UP}': 'ArrowUp',
+        '\${KEY_RIGHT}': 'ArrowRight',
+        '\${KEY_DOWN}': 'ArrowDown',
+        '\${KEY_PGUP}': 'PageUp',
+        '\${KEY_PAGE_UP}': 'PageUp',
+        '\${KEY_PGDN}': 'PageDown',
+        '\${KEY_PAGE_DOWN}': 'PageDown',
+        '\${KEY_BKSP}': 'Backspace',
+        '\${KEY_BACKSPACE}': 'Backspace',
+        '\${KEY_DEL}': 'Delete',
+        '\${KEY_DELETE}': 'Delete',
+        '\${KEY_ENTER}': 'Enter',
+        '\${KEY_TAB}': 'Tab',
+        '\${KEY_HOME}': 'Home'
+    };
 
 
-    // exported test
-    ${convertedCommands.join('\n\t/**--------------------------------------------------------------------------------------------------------------------------**/')}
+    //exported test
+    ${convertedCommands.join('\t')}
+    await browser.close();\n\n\n\t//function definitions\n`
 
-    await browser.close();
-    
-})()`;
+                //add function definitions to output
+                var functions = Object.values(exportFunctions);
+                var i, length = functions.length;
+                for (i = 0; i < length; i++) {
+                    content += functions[i].toString() + "\n";
+                }
 
-
+                content += `})()`;
                 extension = 'js';
                 mimetype = 'application/javascript';
                 break;
@@ -674,6 +620,7 @@ async function assertionHelper(target, regex) {
                 extension = 'txt';
                 mimetype = 'text/plain';
         }
+
         sendResponse({
             status: true,
             payload: {
