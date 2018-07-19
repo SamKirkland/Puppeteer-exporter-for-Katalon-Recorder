@@ -1,8 +1,12 @@
 // Chrome Extension ID: ljdobmomdgdljniojadhoplhkpialdid
 // Firefox Extension ID: {91f05833-bab1-4fb1-b9e4-187091a4d75d}
-
 var extensionId = bowser.firefox ? '{91f05833-bab1-4fb1-b9e4-187091a4d75d}' : 'ljdobmomdgdljniojadhoplhkpialdid';
 
+/** version 0.1 2009-04-30
+ * @author      Andrea Giammarchi
+ * @license     Mit Style License
+ * @project     http://code.google.com/p/css2xpath/
+ */css2xpath = (function () { var b = [/\[([^\]~\$\*\^\|\!]+)(=[^\]]+)?\]/g, "[@$1$2]", /\s*,\s*/g, "|", /\s*(\+|~|>)\s*/g, "$1", /([a-zA-Z0-9\_\-\*])~([a-zA-Z0-9\_\-\*])/g, "$1/following-sibling::$2", /([a-zA-Z0-9\_\-\*])\+([a-zA-Z0-9\_\-\*])/g, "$1/following-sibling::*[1]/self::$2", /([a-zA-Z0-9\_\-\*])>([a-zA-Z0-9\_\-\*])/g, "$1/$2", /\[([^=]+)=([^'|"][^\]]*)\]/g, "[$1='$2']", /(^|[^a-zA-Z0-9\_\-\*])(#|\.)([a-zA-Z0-9\_\-]+)/g, "$1*$2$3", /([\>\+\|\~\,\s])([a-zA-Z\*]+)/g, "$1//$2", /\s+\/\//g, "//", /([a-zA-Z0-9\_\-\*]+):first-child/g, "*[1]/self::$1", /([a-zA-Z0-9\_\-\*]+):last-child/g, "$1[not(following-sibling::*)]", /([a-zA-Z0-9\_\-\*]+):only-child/g, "*[last()=1]/self::$1", /([a-zA-Z0-9\_\-\*]+):empty/g, "$1[not(*) and not(normalize-space())]", /([a-zA-Z0-9\_\-\*]+):not\(([^\)]*)\)/g, function (f, e, d) { return e.concat("[not(", a(d).replace(/^[^\[]+\[([^\]]*)\].*$/g, "$1"), ")]") }, /([a-zA-Z0-9\_\-\*]+):nth-child\(([^\)]*)\)/g, function (f, e, d) { switch (d) { case "n": return e; case "even": return "*[position() mod 2=0 and position()>=0]/self::" + e; case "odd": return e + "[(count(preceding-sibling::*) + 1) mod 2=1]"; default: d = (d || "0").replace(/^([0-9]*)n.*?([0-9]*)$/, "$1+$2").split("+"); d[1] = d[1] || "0"; return "*[(position()-".concat(d[1], ") mod ", d[0], "=0 and position()>=", d[1], "]/self::", e) } }, /:contains\(([^\)]*)\)/g, function (e, d) { return "[contains(text(),'" + d + "')]" }, /\[([a-zA-Z0-9\_\-]+)\|=([^\]]+)\]/g, "[@$1=$2 or starts-with(@$1,concat($2,'-'))]", /\[([a-zA-Z0-9\_\-]+)\*=([^\]]+)\]/g, "[contains(@$1,$2)]", /\[([a-zA-Z0-9\_\-]+)~=([^\]]+)\]/g, "[contains(concat(' ',normalize-space(@$1),' '),concat(' ',$2,' '))]", /\[([a-zA-Z0-9\_\-]+)\^=([^\]]+)\]/g, "[starts-with(@$1,$2)]", /\[([a-zA-Z0-9\_\-]+)\$=([^\]]+)\]/g, function (f, e, d) { return "[substring(@".concat(e, ",string-length(@", e, ")-", d.length - 3, ")=", d, "]") }, /\[([a-zA-Z0-9\_\-]+)\!=([^\]]+)\]/g, "[not(@$1) or @$1!=$2]", /#([a-zA-Z0-9\_\-]+)/g, "[@id='$1']", /\.([a-zA-Z0-9\_\-]+)/g, "[contains(concat(' ',normalize-space(@class),' '),' $1 ')]", /\]\[([^\]]+)/g, " and ($1)"], c = b.length; return function a(e) { var d = 0; while (d < c) { e = e.replace(b[d++], b[d++]) } return "//" + e } })();
 /*
 Periodically send a message to Katalon Recorder with a list of capabilities. If Katalon Recorder does not receive any message for 2 minutes, it will stop communicating with the plugin.
 
@@ -139,7 +143,8 @@ var exportFunctions = {
         var property;
         try {
             var container = await getContainer(target);
-            const elementHandle = await container.waitForXPath(target);
+            var query = await container.$x(target);
+            var elementHandle = query[0];
             const jshandle = await elementHandle.getProperty('text');
             property = await jshandle.jsonValue();
         } catch (err) {
@@ -176,7 +181,8 @@ var exportFunctions = {
         var property;
         try {
             var container = await getContainer(target);
-            const elementHandle = await container.waitForXPath(target);
+            var query = await container.$x(target);
+            var elementHandle = query[0];
             const jshandle = await elementHandle.getProperty('value');
             property = await jshandle.jsonValue();
         } catch (err) {
@@ -209,38 +215,23 @@ var exportFunctions = {
 
     click: async function click(target) {
         var container = await getContainer(target);
-        var query;
-
-        try {
-            query = await container.waitForXPath(target, { timeout: 5000, visible: true });
-        } catch (error) {
-            query = await container.$x(target);
-        }
-
-
-        //currently, Puppeteer's frame.click() does not support XPath, and frame.click() is what updates the page.
-        //When the clicked element is a link, we must instead use goto because goto updates the page object.
-        var elementHandle = query.length === undefined ? query : query[0];
-        var taghandle = await elementHandle.getProperty('tagName');
-        var tag = await taghandle.jsonValue().toString().toLowerCase();
+        var query = await container.$x(target);
+        var elementHandle = query[0];
 
         var navigation = page.waitForRequest(
             (r) => { return (r.method() === 'GET' && r.isNavigationRequest() && r.frame() === page.mainFrame()) },
             { timeout: 800 }
         );
-        try {
-            await elementHandle.click();
-        } catch (error) {
-            console.log(elementHandle);
-        }
 
+        await elementHandle.click();
+
+        //if an error is thrown, no navigation reqest was received and it should move on
         try {
             await navigation;
+            await page.waitForNavigation({ waitUntil: 'load' });
         } catch (error) {
             return;
         }
-
-        await page.waitForNavigation({ waitUntil: 'load' });
     },
 
     deleteAllVisibleCookies: async function deleteAllVisibleCookies() {
@@ -294,25 +285,31 @@ var exportFunctions = {
     },
 
     selectFrame: async function selectFrame(target) {
-        await page.waitFor(4000);
         var frames = await page.frames();
-        tempContainer = page;
+        var newFrame;
+
         //relative=top will change frame to top frame
-        if (target === 'relative=top') {
-            tempContainer = frames[lastIndex].parentFrame();
+        if (target === 'relative=parent') {
+            selectedFrame = selectedFrame.parentFrame();
         }
+
+        else if (target === 'relative=top') {
+            selectedFrame = frames[frames.length - 1];
+        }
+
         //index=x will change frame to frame x
         else if (target.substring(0, 5) === 'index') {
             var num = target.substring(6);
             var index = parseInt(num);
-            tempContainer = frames[index];
+            selectedFrame = frames[index];
         }
+
         //finds frame through name and target
         else {
-            tempContainer = await frames.find(f => f.name() === target.substring(3, target.length));
-            //if it still hasn't found, set equal to last index used
-            if (tempContainer === null) {
-                tempContainer = frames[lastIndex];
+            newFrame = await frames.find(f => f.name() === target.substring(3, target.length));
+            
+            if (newFrame !== null && newFrame !== undefined) {
+                selectedFrame = newFrame;
             }
         }
     },
@@ -347,16 +344,16 @@ var exportFunctions = {
 
         try {
             await navigation;
+            await page.waitForNavigation({ waitUntil: 'load' });
         } catch (error) {
             return;
         }
-
-        await page.waitForNavigation({ waitUntil: 'load' });
     },
 
     type: async function type(target, value) {
         var container = await getContainer(target);
-        const elementHandle = await container.waitForXPath(target);
+        var query = await container.$x(target);
+        var elementHandle = query[0];
         await elementHandle.type(value);
     },
 
@@ -364,7 +361,8 @@ var exportFunctions = {
         var property;
         try {
             var container = await getContainer(target);
-            const elementHandle = await container.waitForXPath(target);
+            var query = await container.$x(target);
+            var elementHandle = query[0];
             const jshandle = await elementHandle.getProperty('checked');
             property = await jshandle.jsonValue();
         } catch (err) {
@@ -390,7 +388,8 @@ var exportFunctions = {
         var property;
         try {
             var container = await getContainer(target);
-            const elementHandle = await container.waitForXPath(target);
+            var query = await container.$x(target);
+            var elementHandle = query[0];
             const jshandle = await elementHandle.getProperty('text');
             property = await jshandle.jsonValue();
         } catch (err) {
@@ -423,7 +422,8 @@ var exportFunctions = {
         var property;
         try {
             var container = await getContainer(target);
-            const elementHandle = await container.waitForXPath(target);
+            var query = await container.$x(target);
+            var elementHandle = query[0];
             const jshandle = await elementHandle.getProperty('value');
             property = await jshandle.jsonValue();
         } catch (err) {
@@ -438,7 +438,10 @@ var exportFunctions = {
     },
 
     waitForPageToLoad: async function waitForPageToLoad() {
-        while (await page.evaluate('document.readyState !== \'complete\';'));
+        await page.waitForFunction(() => {
+            while (document.readyState !== 'complete');
+            return true;
+        });
     },
 
     waitForVisible: async function waitForVisible(target) {
@@ -447,23 +450,69 @@ var exportFunctions = {
     },
 
     getContainer: async function getContainer(selector) {
-        var query = await page.$x(selector);
-        var elementhandle = query.length === undefined ? query : query[0];
+        await waitForPageToLoad();
 
-        if (elementhandle && elementhandle.toString() !== undefined) { //added the toString check because .$x() returns [] if not found, not null/undefined
-            return page;
-        } else {
-            var frames = await page.frames();
-            var i, length = frames.length;
-            for (i = 0; i < length; i++) {
-                query = await frames[i].$x(selector);
-                elementhandle = query.length === undefined ? query : query[0];
+        var query = await selectedFrame.$x(selector);
+        var element = query[0];
+        if (element && element != undefined && element.toString() !== undefined) return selectedFrame;
 
-                if (elementhandle && elementhandle.toString() !== undefined) {
-                    return frames[i];
+        var frames = await page.frames();
+        var i, length = frames.length;
+        for (i = 0; i < length; i++) {
+            query = await frames[i].$x(selector);
+            element = query[0];
+            if (element && element != undefined && element.toString() !== undefined) return frames[i];
+        }
+
+        //If this is reached, target was not found in any frame, so the locator was bad. We'll check 'nearby' elements
+        selectorLength = selector.length;
+        var j;
+
+        //if the xpath ends with someTag[n], then try all indices lower than n.
+        if (selector.charAt(selectorLength - 1) === ']') {
+            try {
+                j = selectorLength - 3;
+                while (selector.charAt(j) !== '[') j--;
+
+                var index = parseInt(selector.substring(j + 1, selectorLength - 1)) - 1;
+
+                while (index > 0) {
+                    var newTarget = selector.substring(0, j + 1) + index + ']';
+                    console.log('Element not found. Trying with next oldest sibiling: ' + newTarget);
+
+                    length = frames.length;
+                    for (i = 0; i < length; i++) {
+                        query = await frames[i].$x(selector);
+                        element = query[0];
+                        if (element && element != undefined && element.toString() !== undefined) return frames[i];
+                    }
+
+                    index--;
                 }
+            } catch (error) {
+                //move on
             }
         }
+
+        //try using the parent
+        try {
+            j = selectorLength - 1;
+            while (selector.charAt(j) !== '/' && selector.charAt(j - 1) !== '\\') j--;
+            if (selector.charAt(j - 1) === '/') j--;
+
+            var parent = selector.substring(0, j);
+            console.log('Element not found. Trying with parent: ' + parent);
+            length = frames.length;
+            for (i = 0; i < length; i++) {
+                query = await frames[i].$x(selector);
+                element = query[0];
+                if (element && element != undefined && element.toString() !== undefined) return frames[i];
+            }
+        } catch (error) {
+            console.log(error);
+        }
+
+        console.log('Element still not found. Returning null.');
         return null;
     },
 
@@ -487,29 +536,34 @@ var exportFunctions = {
     },
 };
 
+/**
+ * This function assumes that Katalon's Record uses the ExtensionScript.js, which
+ * should be found in the same directory as this file (background.js). The preference of
+ * locators is absoluteCSS, xpath:position, xpath:idRelative, xpath:link, css.
+ * It is unlikely that anything other than xpath will be received, as absoluteCSS does not
+ * currently work. The rest of the checks are just in case.
+ * */
 function locatorToSelector(target) {
     var selector = target;
 
-    if (target.substring(0, 3) === "id=") {
-        selector = "//*[@id=\"" + target.substring(3, target.length) + "\"]";
+    if (target.substring(0, 1) === "/" || target.substring(0, 2) === "//") {
+        return selector;
+    } else if (target.substring(0, 6) === "xpath=") {
+        selector = target.substring(6, target.length);
+    } else if (target.substring(0, 12) === "absoluteCSS=") {
+        selector = css2xpath(target.substring(12, target.length));
+    } else if (target.substring(0, 4) === "css=") {
+        selector = css2xpath(target.substring(4, target.length));
     } else if (target.substring(0, 5) === "name=") {
         selector = "//*[@name=\"" + target.substring(5, target.length) + "\"]";
+    } else if (target.substring(0, 3) === "id=") {
+        selector = "//*[@id=\"" + target.substring(3, target.length) + "\"]";
     } else if (target.substring(0, 5) === "link=") {
         var offset = 5;
-        if(target.substring(5, 11) == 'exact:') {
+        if (target.substring(5, 11) == 'exact:') {
             offset = 11
         }
         selector = "//a[contains(text(),'" + target.substring(offset, target.length) + "')]";
-    } else if (target.substring(0, 11) === "identifier=") {
-        selector = "[name=" + target.substring(11, target.length) + "],[id=" + target.substring(11, target.length) + "]";
-    } else if (target.substring(0, 4) === "css=") {
-        //selector = target.substring(4, target.length);
-    } else if (target.substring(0, 3) === "ui=") {
-        throw new Error("The 'ui=' locator is not supported.");
-    } else if (target.substring(0, 4) === "dom=") {
-        throw new Error("The 'dom=' locator is not supported.");
-    } else if (target.substring(0, 6) === "xpath=") {
-        selector = target.substring(6, target.length);
     }
 
     return selector;
@@ -584,8 +638,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
 (async () => {
     let browser = await puppeteer.launch({ headless: false, args: ['--start-maximized'] });
     var page = await browser.newPage();
-    var tempContainer = page;
-    var lastIndex = 0;
+    var selectedFrame = page;
     await page._client.send('Emulation.clearDeviceMetricsOverride');
     var winWidth = await page.evaluate(async () => { return await window.innerWidth; });
     var winHeight = await page.evaluate(async () => { return await window.innerHeight; });
