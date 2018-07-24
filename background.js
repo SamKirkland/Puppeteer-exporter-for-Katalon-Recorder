@@ -143,6 +143,8 @@ var exportFunctions = {
         var property;
         try {
             var container = await getContainer(target);
+            target = container.target;
+            container = container.container;
             var query = await container.$x(target);
             var elementHandle = query[0];
             const jshandle = await elementHandle.getProperty('text');
@@ -181,6 +183,8 @@ var exportFunctions = {
         var property;
         try {
             var container = await getContainer(target);
+            target = container.target;
+            container = container.container;
             var query = await container.$x(target);
             var elementHandle = query[0];
             const jshandle = await elementHandle.getProperty('value');
@@ -215,6 +219,8 @@ var exportFunctions = {
 
     click: async function click(target) {
         var container = await getContainer(target);
+        target = container.target;
+        container = container.container;
         var query = await container.$x(target);
         var elementHandle = query[0];
 
@@ -244,6 +250,8 @@ var exportFunctions = {
         var container;
         if (value !== "#shownotification") {
             container = await getContainer(target);
+            target = container.target;
+            container = container.container;
         } else {
             container = page;
         }
@@ -266,6 +274,8 @@ var exportFunctions = {
 
     mouseOver: async function mouseOver(target) {
         var container = await getContainer(target);
+        target = container.target;
+        container = container.container;
         await container.hover(target);
     },
 
@@ -307,7 +317,7 @@ var exportFunctions = {
         //finds frame through name and target
         else {
             newFrame = await frames.find(f => f.name() === target.substring(3, target.length));
-            
+
             if (newFrame !== null && newFrame !== undefined) {
                 selectedFrame = newFrame;
             }
@@ -352,6 +362,8 @@ var exportFunctions = {
 
     type: async function type(target, value) {
         var container = await getContainer(target);
+        target = container.target;
+        container = container.container;
         var query = await container.$x(target);
         var elementHandle = query[0];
         await elementHandle.type(value);
@@ -361,6 +373,8 @@ var exportFunctions = {
         var property;
         try {
             var container = await getContainer(target);
+            target = container.target;
+            container = container.container;
             var query = await container.$x(target);
             var elementHandle = query[0];
             const jshandle = await elementHandle.getProperty('checked');
@@ -388,6 +402,8 @@ var exportFunctions = {
         var property;
         try {
             var container = await getContainer(target);
+            target = container.target;
+            container = container.container;
             var query = await container.$x(target);
             var elementHandle = query[0];
             const jshandle = await elementHandle.getProperty('text');
@@ -422,6 +438,8 @@ var exportFunctions = {
         var property;
         try {
             var container = await getContainer(target);
+            target = container.target;
+            container = container.container;
             var query = await container.$x(target);
             var elementHandle = query[0];
             const jshandle = await elementHandle.getProperty('value');
@@ -446,73 +464,99 @@ var exportFunctions = {
 
     waitForVisible: async function waitForVisible(target) {
         var container = await getContainer(target);
+        target = container.target;
+        container = container.container;
         return await container.waitForXPath(target, { visible: true });
     },
 
     getContainer: async function getContainer(selector) {
         await waitForPageToLoad();
 
-        var query = await selectedFrame.$x(selector);
-        var element = query[0];
-        if (element && element != undefined && element.toString() !== undefined) return selectedFrame;
+        try {
+            await selectedFrame.waitForXPath(selector, { timeout: 3000 , visible: true});
+            return { container: selectedFrame, target: selector };
+        } catch (timeout) {
+            //element was not in selectedFrame
+        }
 
+        var result = await searchFrames(selector);
+        if (result) return { container: result, target: selector };
+
+        //If this is reached, target was not found in any frame, so the locator was bad.
+        console.log('Element not found at the given locator: ' + selector);
+
+        //The code below will search nearby indices for nth-of-type elements
+        var nthIndexBounds = [];
+        var j = selector.length - 1;
+        while (j > 0) {
+            //skip if the ancestor is an not nth-of-type()
+            if (selector.charAt(j) === ']') {
+                var k = j;
+
+                //grab the index. skip if there is no index
+                j = j - 2;
+                while (selector.charAt(j) !== '[') j--;
+                try {
+                    index = parseInt(selector.substring(j + 1, k));
+                    if (isNaN(index)) throw Error('Tried to parse a predicate as an index. Oops. Moving on.');
+                    nthIndexBounds.unshift(k); //end
+                    nthIndexBounds.unshift(j + 1); //start
+                } catch (notAnInt) {
+                    //console.log(notAnInt);
+                }
+            }
+
+            //find the next ancestor's end
+            while (j > 0 && selector.charAt(j) !== '/' && selector.charAt(j - 1) !== '/') {
+                j--;
+            }
+
+            j--;
+        }
+
+        //while holding all else the same, check the closest indices of all elements in the path where
+        //an index is used (nth-of-type elements)
+        //ex: //span[5]/div[5], //span[4]/div[5], //span[3]/div[5]... //span[6]/div[5]... //span[5]/div[4]... //span[5]/div[6]... and so on
+        var numIndices = nthIndexBounds.length / 2;
+        for (i = 0; i < numIndices; i += 2) {
+            var start = nthIndexBounds[i];
+            var end = nthIndexBounds[i + 1];
+            var index = parseInt(selector.substring(start, end));
+            var newSelector;
+
+            var range = 10;
+            for (j = -1 * range; j <= range; j++) {
+                if (index + j < 1 || j === 0) continue;
+                newSelector = selector.substring(0, start) + (index + j) + selector.substring(end, selector.length);
+                console.log('Looking for element at: ' + newSelector);
+                var result = await searchFrames(newSelector);
+                if (result) {
+                    return { container: result, target: newSelector };
+                }
+            }
+        }
+
+        console.log('Element not found. Returning null.');
+        return null;
+    },
+
+    searchFrames: async function searchFrames(selector) {
+        await page.waitFor(500);
         var frames = await page.frames();
         var i, length = frames.length;
         for (i = 0; i < length; i++) {
             query = await frames[i].$x(selector);
             element = query[0];
-            if (element && element != undefined && element.toString() !== undefined) return frames[i];
-        }
-
-        //If this is reached, target was not found in any frame, so the locator was bad. We'll check 'nearby' elements
-        selectorLength = selector.length;
-        var j;
-
-        //if the xpath ends with someTag[n], then try all indices lower than n.
-        if (selector.charAt(selectorLength - 1) === ']') {
-            try {
-                j = selectorLength - 3;
-                while (selector.charAt(j) !== '[') j--;
-
-                var index = parseInt(selector.substring(j + 1, selectorLength - 1)) - 1;
-
-                while (index > 0) {
-                    var newTarget = selector.substring(0, j + 1) + index + ']';
-                    console.log('Element not found. Trying with next oldest sibiling: ' + newTarget);
-
-                    length = frames.length;
-                    for (i = 0; i < length; i++) {
-                        query = await frames[i].$x(selector);
-                        element = query[0];
-                        if (element && element != undefined && element.toString() !== undefined) return frames[i];
-                    }
-
-                    index--;
+            if (element && element != undefined && element.toString() !== undefined) {
+                try {
+                    frames[i].waitFor(selector, {timeout: 5000, visible: true});
+                } catch (error) {
+                    throw "Element found, but it never became visible. " + error;
+                    process.exit();
                 }
-            } catch (error) {
-                //move on
+                return frames[i];
             }
         }
-
-        //try using the parent
-        try {
-            j = selectorLength - 1;
-            while (selector.charAt(j) !== '/' && selector.charAt(j - 1) !== '\\') j--;
-            if (selector.charAt(j - 1) === '/') j--;
-
-            var parent = selector.substring(0, j);
-            console.log('Element not found. Trying with parent: ' + parent);
-            length = frames.length;
-            for (i = 0; i < length; i++) {
-                query = await frames[i].$x(selector);
-                element = query[0];
-                if (element && element != undefined && element.toString() !== undefined) return frames[i];
-            }
-        } catch (error) {
-            console.log(error);
-        }
-
-        console.log('Element still not found. Returning null.');
         return null;
     },
 
@@ -596,7 +640,7 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                     "echo": (x) => `await echo(\`${locatorToSelector(x.target)}\`, \`${x.value}\`);\n`,
                     "get": (x) => `await get(\`${x.target}\`);\n`,
                     "comment": (x) => `//${x.target}\n`,
-                    "sendkeys": (x) => `await sendKeys(keyDictionary['${x.target}']);\n`,
+                    "sendkeys": (x) => `await sendKeys(keyDictionary[\`\\${x.target.charAt(0) === '$' ? x.target : x.value}\`]);\n`,
                     "selectframe": (x) => `await selectFrame(\`${x.target}\`);\n`,
                     "assertalert": (x) => `await assertAlert(\`${x.target}\`);\n`,
                     "asserttext": (x) => `await assertText(\`${locatorToSelector(x.target)}\`, \`${x.value}\`);\n`,
