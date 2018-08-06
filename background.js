@@ -45,6 +45,11 @@ function register() {
                         id: 'puppeteerBT',
                         summary: 'PuppeteerBT',
                         type: 'export'
+                    },
+                    {
+                        id: 'autobots',
+                        summary: 'autobots',
+                        type: 'export'
                     }
                 ]
             }
@@ -724,6 +729,146 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
                 mimetype = 'application/javascript';
                 break;
 
+            case 'autobots':
+                convertToAutobots = {
+                    "open": (x) => convert_open(x),
+                    "click": (x) => convert_click(x),
+                    "store": (x) => `\n\t\t//initialize variable: ${x.target} with value: ${x.value}\n\t\tvar ${x.target} = '${x.value}';\n`,
+                    "type": (x) => convert_type(x),
+                    "get": (x) => convert_open(x),
+                    "comment": (x) => `\t\t// ${x.target}\n`,
+                    "sendkeys": (x) => convert_sendKeys(x),
+                    "selectFrame": (x) => convert_selectFrame(x),
+                    "captureScreenshot": (x) => convert_captureScreenshot(x),
+                    "captureEntirePageScreenshot": (x) => convert_captureScreenshot(x),
+                    "bringBrowserToForeground": (x) => `\n\t\t//Bring browser to foreground\n\t\tawait page.bringToFront();\n`,
+                    "refresh": (x) => `\n\t\t//Refresh the page\n\t\tawait globalUI.refreshPage();\n`,
+                    "selectWindow": (x) => convert_selectWindow(x),
+                    "pause": (x) => `\n\t\t//Delay for ${x.target} milliseconds\n\t\tawait globalUI.delay(${x.target});\n`,
+                    "mouseOver": (x) => convert_mouseOver(x),
+                    "deleteAllVisibleCookies": (x) => convert_deleteAllCookies(x),
+                    "echo": (x) => tempFunction(x),
+                    "assertAlert": (x) => tempFunction(x),
+                    "assertText": (x) => convert_assertText(x),
+                    "assertTitle": (x) => tempFunction(x),
+                    "assertValue": (x) => convert_assertValue(x),
+                    "assertElementPresent": (x) => convert_testID(x),
+                    "assertPrompt": (x) => tempFunction(x),
+                    "verifyChecked": (x) => convert_verifyChecked(x),
+                    "verifyNotChecked": (x) => convert_verifyNotChecked(x),
+                    "verifyElementPresent": (x) => convert_testID(x),
+                    "verifyText": (x) => convert_testID(x),
+                    "verifyTitle": (x) => convert_testID(x),
+                    "verifyValue": (x) => convert_testID(x),
+                    "waitForPageToLoad": (x) => `\n\t\t//Wait for current page to load\n\t\tawait globalUI.waitForPageToLoad();`,
+                    "waitForVisible": (x) => convert_testID(x)
+                }
+
+                let autobotsConvertedCommands = commands.map((c) => {
+                    let equivCommand = convertToAutobots[c.command];
+
+                    //return it
+                    if (typeof equivCommand !== "undefined") {
+                        return equivCommand(c);
+                    }
+                    else {
+                        return `\n\t\t//not supported command: ${c.command} with target: ${c.target}\n\n`;
+                    }
+                    //return `alert('Command "${c.command.toLowerCase()}" not supported');`; //, ${c.target}', '${x.value}');`;
+                });
+
+
+                content =
+                    `var fields = require('./globalFields');
+var bt = require('./globalFunctions');
+var builderLinks = require('./builderLinks');
+var colors = require('colors');
+const puppeteer = require('puppeteer');
+var browserState = require('./isHeadless');
+var isHeadless = browserState.getHeadless();
+var isSlowMo = browserState.getSlowMo();
+var chromiumProfile = "C:\\\\uitests\\\\chromiumProfile";
+
+//call function
+testName();
+
+/**
+   * DESCRIBE THE TEST HERE
+   * @example testName()
+   * */
+async function testName() {
+    await puppeteer.launch({ headless: isHeadless, userDataDir: chromiumProfile, slowMo: isSlowMo, args: ['--start-maximized'] }).then(async browser => {
+        //this will log the failure, close the browser, and exit Node if pupeteer fails
+        const unhandledRejectionHandler = (reason, p) => {
+            console.log('FAIL Unhandled Rejection, '.bold.red + reason.bold.red);
+            browser.close();
+            process.exit();
+        };
+        //this will handle puppeteer getting unhandled promise rejection
+        process.on('unhandledRejection', unhandledRejectionHandler);
+        const initialPage = await browser.pages();
+        const page = await initialPage[0];
+
+        //If page has error, such as such as jserror
+        await page.on("pageerror", async function (err) {
+            theTempValue = await err.toString();
+            var newText = await theTempValue.indexOf("cannot call methods on dialog prior to initialization; attempted to call method 'option'");
+            if (newText < 0) {
+                await console.log('\\nJS Error: '.bold.red + err.bold.red);
+            }
+        });
+        //If page has error, such as exception
+        await page.on("error", async function (err) {
+            await console.log('\\nOther Error: '.bold.red + err.bold.red);
+        });
+        //If page has error where link takes you to error page
+        await page.on("load", async function (err) {
+            page.evaluate(() => document.body.innerText)
+                .then(function (resp) {
+                    tempValue = resp;
+                    var textThere = tempValue.indexOf("We're sorry, the system has encountered an error processing your request.");
+                    if (textThere > -1) {
+                        console.log('\\nError: '.bold.red + err.bold.red);
+                    }
+                });
+        });
+        //for js alerts
+        await page.on('dialog', async dialog => {
+            await dialog.accept()
+                .then(function (resp) {
+                    console.log("\\n**Click OK in javascript alert**".bold.yellow);
+                    console.log('Javascript Alert Text: '.gray + dialog.message().gray);
+                }).catch(function (error) {
+                    console.log('FAIL Javascript Alert OK pressed : '.bold.red + err.bold.red);
+                });
+        });
+
+        //setup puppeteer
+        const globalUI = await new bt(page);
+        await page.setViewport({ width: 1920, height: 1080 });
+        //set errorscreenshot name
+        var theName = await arguments.callee.toString().match(/function ([^\\(]+)/)[1];
+        await globalUI.setScreenshotErrorName(theName, arguments.callee);
+
+        //set variables
+        var theSetTime = await globalUI.getShortDate();
+
+        /////////////////////////////////
+        // BEGIN TESTS
+        /////////////////////////////////
+
+        ${autobotsConvertedCommands.join('')}
+        //close the browser
+        await setTimeout(function () { browser.close(); }, 2500);
+    });
+}
+
+${selectorsObjectString}
+}`;
+                extension = 'js';
+                mimetype = 'application/javascript';
+                break;    
+
             case 'json':
                 content = JSON.stringify(commands);
                 extension = 'json';
@@ -746,3 +891,485 @@ chrome.runtime.onMessageExternal.addListener(function (message, sender, sendResp
         });
     }
 });
+
+///////////////////////////////////////////////
+//      FUNCTIONS FOR AUTOBOTS EXPORT        //
+///////////////////////////////////////////////
+
+//hold count for selectors we need names for
+var selectorCount = 1;
+
+//will hold all the selectors in an object
+var selectorsObjectString = `testFields = {\n\t`;
+
+//will add the selector to the selectorsObjectString if it isn't there already
+function addToSelectorsObject(theSelectorObject) {
+    //initialize variables
+    var objectTitle = theSelectorObject.title;
+    var newObject = JSON.stringify(theSelectorObject);
+
+
+    //fix object formatting problems
+    newObject = newObject.replace(/"id":/g, "id: ");
+    newObject = newObject.replace(/"title":/g, "\t\ttitle: ");
+    newObject = newObject.replace(/,/g, ",\n");
+    newObject = newObject.replace(/{/g, "{\n\t\t");
+    newObject = newObject.replace(/}/g, "\n\t},\n\t");
+
+    //only add it if it doesn't exist yet
+    if (selectorsObjectString.indexOf(newObject) == -1) {
+        selectorsObjectString += objectTitle + ": " + newObject;
+    }
+}
+
+//converts the selector
+function convertSelector(theSelector) {
+    var newSelector = ``;
+
+    //regular CSS selector
+    if (theSelector.substr(0, 3) == "id=") {
+        newSelector = "#" + theSelector.substr(3);
+    }
+    //xPath
+    else if (theSelector.indexOf("[@id") != -1) {
+        newSelector = "//*" + theSelector.substr(theSelector.indexOf("[@id"));
+    }
+    //xPath other
+    else if (theSelector.indexOf("xpath=") != -1) {
+        newSelector = "//*" + theSelector.substr(theSelector.indexOf("[@"));
+    }
+    //something else
+    else {
+        newSelector = theSelector;
+    }
+
+    //return the new selector
+    return newSelector;
+}
+
+//gets title for selector
+function getSelectorTitle(theSelector) {
+    var newSelector = theSelector;
+
+    //remove everything until there are no underscores left
+    do {
+        newSelector = newSelector.substr(newSelector.indexOf("_") + 1);
+    } while (newSelector.indexOf("ctl00_") != -1 || newSelector.indexOf("BaseMain_") != -1 || newSelector.indexOf("MainContentHolder_") != -1 || newSelector.indexOf("MasterMain_") != -1 || newSelector.indexOf("BTTabControl1_") != -1 || newSelector.indexOf("ctlMainMenu_") != -1)
+
+    //fix titles to have no special characters
+    if (newSelector.indexOf("/") != -1 || newSelector.indexOf("xpath=") != -1) {
+        newSelector = "selector" + selectorCount;
+        selectorCount++;
+    }
+
+    //return the new selector
+    return newSelector;
+}
+
+//OPEN
+function convert_open(x) {
+    //initialize string
+    var theString = ``;
+
+    //finalize theString
+    theString = `//go to ${x.target}\n\t\t`;
+    theString += `await globalUI.goToPage('${x.target}');\n`;
+
+    //return the string
+    return theString;
+}
+
+//CLICK
+function convert_click(x) {
+    //initialize string
+    var theString = ``;
+
+    //initialize the selector
+    var theSelector = {
+        id: "",
+        title: ""
+    };
+
+    //for top menu (if needed)
+    var hoverSelector = {
+        id: "",
+        title: ""
+    };
+
+    //if not a link
+    if (x.target.indexOf("link=") == -1) {
+        //convert selector
+        theSelector.id = convertSelector(x.target);
+        theSelector.title = getSelectorTitle(x.target);
+
+        //add to selector object
+        addToSelectorsObject(theSelector);
+
+        //if its not the dropdown menu
+        if (x.target.indexOf("rptNewDropDownMenuItems") == -1) {
+            //if its not a dropdown item
+            if (theSelector.id.indexOf("ul") == -1 && theSelector.id.indexOf("li") == -1) {
+                theString = `\n\t\t//click on selector: ${theSelector.title}\n\t\tawait globalUI.clickID(testFields.${theSelector.title});\n`;
+            }
+            //if its a dropdown item
+            else {
+                theString = `\n\t\t//click on selector: ${theSelector.title}\n\t\tawait globalUI.clickHiddenID(testFields.${theSelector.title});\n`;
+            }
+        }
+        else {
+            //need to get the top menu selector
+            hoverSelector.id = convertSelector(x.target);
+            hoverSelector.title = getSelectorTitle(x.target);
+
+            //modify them to make it the appropriate main icon
+            hoverSelector.id = hoverSelector.id.substr(0, hoverSelector.id.indexOf("rptNew"));
+            hoverSelector.id += "pnlNewTopMenu";
+            hoverSelector.title = hoverSelector.title.substr(0, 5) + "_pnlNewTopMenu";
+
+            //add to selector object
+            addToSelectorsObject(hoverSelector);
+
+            theString = `
+        //hover over top menu selector: ${hoverSelector.title}
+        await globalUI.mouseHoverOver(testFields.${hoverSelector.title});
+        
+        //click on the dropdown menu icon: ${theSelector.title}
+        await globalUI.clickID(testFields.${theSelector.title});\n`;
+        }
+    }
+    //if it is a link
+    else {
+        //trim down the link to just the text
+        var theLink = x.target.substr(5);
+
+        //open link by text
+        theString = `
+        //open link with text: ${theLink}
+        await globalUI.clickText("${theLink}");\n`;
+    }
+
+    //return the string
+    return theString;
+}
+
+//TYPE
+function convert_type(x) {
+    //initialize string
+    var theString = ``;
+
+    //initialize the selector
+    var theSelector = {
+        id: "",
+        title: ""
+    };
+
+    //convert selector
+    theSelector.id = convertSelector(x.target);
+    theSelector.title = getSelectorTitle(x.target);
+
+    //add to selector object
+    addToSelectorsObject(theSelector);
+
+    //if its not the dropdown menu
+    theString = `
+        //populate ${theSelector.title} with value: ${x.value}
+        await globalUI.fillTextField(testFields.${theSelector.title}, "${x.value}");\n`;
+
+
+    //return the string
+    return theString;
+}
+
+//ASSERT TEXT
+function convert_assertText(x) {
+    //initialize string
+    var theString = ``;
+
+    //initialize the selector
+    var theSelector = {
+        id: "",
+        title: ""
+    };
+
+    //convert selector
+    theSelector.id = convertSelector(x.target);
+    theSelector.title = getSelectorTitle(x.target);
+
+    //add to selector object
+    addToSelectorsObject(theSelector);
+
+    //if its not the dropdown menu
+    theString = `
+        //Verify that ${theSelector.title} is populated with text value: ${x.value}
+        await globalUI.testTextValue(testFields.${theSelector.title}, "${x.value}");\n`;
+
+    //return the string
+    return theString;
+}
+
+//ASSERT VALUE
+function convert_assertValue(x) {
+    //initialize string
+    var theString = ``;
+
+    //initialize the selector
+    var theSelector = {
+        id: "",
+        title: ""
+    };
+
+    //convert selector
+    theSelector.id = convertSelector(x.target);
+    theSelector.title = getSelectorTitle(x.target);
+
+    //add to selector object
+    addToSelectorsObject(theSelector);
+
+    //if it's not a checkbox
+    if (x.value != "off" && x.value != "on") {
+        //add to string
+        theString = `
+        //Verify that ${theSelector.title} is populated with value: ${x.value}
+        await globalUI.testValue(testFields.${theSelector.title}, "${x.value}");\n`;
+    }
+    //if its a checkbox
+    else {
+        //checked
+        if (x.value == "on") {
+            //add to string
+            theString = `\n\t\t//Verify that ${theSelector.title} is checked
+        await globalUI.validateCheckedStatus(testFields.${theSelector.title});\n`;
+        }
+        else if (x.value == "off") {
+            //add to string
+            theString = `\n\t\t//Verify that ${theSelector.title} is NOT checked
+        await globalUI.validateNotCheckedStatus(testFields.${theSelector.title});\n`;
+        }
+    }
+
+    //return the string
+    return theString;
+}
+
+//VERIFY CHECKED
+function convert_verifyChecked(x) {
+    //initialize string
+    var theString = ``;
+
+    //initialize the selector
+    var theSelector = {
+        id: "",
+        title: ""
+    };
+
+    //convert selector
+    theSelector.id = convertSelector(x.target);
+    theSelector.title = getSelectorTitle(x.target);
+
+    //add to selector object
+    addToSelectorsObject(theSelector);
+
+    //if its not the dropdown menu
+    theString = `
+        //Verify that ${theSelector.title} is checked
+        await globalUI.validateCheckedStatus(testFields.${theSelector.title});\n`;
+
+    //return the string
+    return theString;
+}
+
+//VERIFY NOT CHECKED
+function convert_verifyNotChecked(x) {
+    //initialize string
+    var theString = ``;
+
+    //initialize the selector
+    var theSelector = {
+        id: "",
+        title: ""
+    };
+
+    //convert selector
+    theSelector.id = convertSelector(x.target);
+    theSelector.title = getSelectorTitle(x.target);
+
+    //add to selector object
+    addToSelectorsObject(theSelector);
+
+    //if its not the dropdown menu
+    theString = `
+        //Verify that ${theSelector.title} is NOT checked
+        await globalUI.validateNotCheckedStatus(testFields.${theSelector.title});\n`;
+
+    //return the string
+    return theString;
+}
+
+//TEST ID
+function convert_testID(x) {
+    //initialize string
+    var theString = ``;
+
+    //initialize the selector
+    var theSelector = {
+        id: "",
+        title: ""
+    };
+
+    //convert selector
+    theSelector.id = convertSelector(x.target);
+    theSelector.title = getSelectorTitle(x.target);
+
+    //add to selector object
+    addToSelectorsObject(theSelector);
+
+    //if its not the dropdown menu
+    theString = `
+        //ensure that ${theSelector.title} is present
+        await globalUI.testID(testFields.${theSelector.title});\n`;
+
+
+    //return the string
+    return theString;
+}
+
+//SELECT FRAME
+function convert_selectFrame(x) {
+    //initialize string
+    var theString = ``;
+
+    //for holding the index
+    var theIndex = x.target;
+
+    //if its the parent, set it to 0, otherwise get the index
+    if (theIndex.indexOf("parent") != -1) {
+        theIndex = 0;
+    }
+    else {
+        theIndex = theIndex.substr(6);
+    }
+
+    //if its not the dropdown menu
+    theString = `
+        //select frame by index: ${theIndex}
+        await globalUI.selectFrameByIndex(${theIndex});\n`;
+
+
+    //return the string
+    return theString;
+}
+
+//SEND KEYS
+function convert_sendKeys(x) {
+    var keyDictionary = {
+        '\${KEY_LEFT}': 'ArrowLeft',
+        '\${KEY_UP}': 'ArrowUp',
+        '\${KEY_RIGHT}': 'ArrowRight',
+        '\${KEY_DOWN}': 'ArrowDown',
+        '\${KEY_PGUP}': 'PageUp',
+        '\${KEY_PAGE_UP}': 'PageUp',
+        '\${KEY_PGDN}': 'PageDown',
+        '\${KEY_PAGE_DOWN}': 'PageDown',
+        '\${KEY_BKSP}': 'Backspace',
+        '\${KEY_BACKSPACE}': 'Backspace',
+        '\${KEY_DEL}': 'Delete',
+        '\${KEY_DELETE}': 'Delete',
+        '\${KEY_ENTER}': 'Enter',
+        '\${KEY_TAB}': 'Tab',
+        '\${KEY_HOME}': 'Home'
+    };
+
+    //get key from dictionary
+    var theKey = keyDictionary[`\\${x.value}`];
+
+    //initialize string
+    var theString = ``;
+
+    //finalize theString
+    theString = `//hit key on keyboard: ${theKey}\n\t\t`;
+    theString += `await globalUI.hitKey('${theKey}');\n`;
+
+    //return the string
+    return theString;
+}
+
+//CAPTURE SCREENSHOT
+function convert_captureScreenshot(x) {
+    //initialize string
+    var theString = ``;
+
+    //finalize theString
+    theString = `//take screenshot and name it: ${x.target}\n\t\t`;
+    theString += `await globalUI.takeScreenshot('${x.target}');\n`;
+
+    //return the string
+    return theString;
+}
+
+//SELECT WINDOW
+function convert_selectWindow(x) {
+    //initialize string
+    var theString = ``;
+
+    //add comment and variable initialization
+    theString = `\n\t\t//select window: ${x.target}\n\t\t`;
+    theString += `var browserTabs = await [];\n\t\tawait browserTabs.push(page);`;
+
+    if (x.target.substring(9) === 'local') {
+        theString += `\n\t\tawait browserTabs[0].bringToFront()\n\t\tpage = browserTabs[0];\n\t\tawait page.waitFor(1000);\n`;
+    } else if (x.target.substring(9) > browserTabs.length) {
+        theString += `\n\t\tvar newTab = await page.browser().newPage();\n\t\tawait newTab.setViewport(page.viewport());\n\t\tawait newTab.goto(${ x.value }, { waitUntil: 'networkidle2' });\n\t\tawait newTab.bringToFront();\n\t\tawait browserTabs.push(newTab);\n\t\tpage = newTab;\n`;
+    } else if (parseInt(x.target.substring(9)) >= 0) {
+        theString += `\n\t\tvar goto = parseInt(target.substring(9));\n\t\tawait browserTabs[goto].bringToFront();\n\t\tpage = browserTabs[goto];\n\t\tawait page.waitFor(1000);\n`;
+    }
+
+    //return the string
+    return theString;
+}
+
+//MOUSE OVER
+function convert_mouseOver(x) {
+    //initialize string
+    var theString = ``;
+
+    //initialize the selector
+    var theSelector = {
+        id: "",
+        title: ""
+    };
+
+    //convert selector
+    theSelector.id = convertSelector(x.target);
+    theSelector.title = getSelectorTitle(x.target);
+
+    //add to selector object
+    addToSelectorsObject(theSelector);
+
+    //if its not the dropdown menu
+    theString = `
+        //Hover mouse over ${theSelector.title}
+        await globalUI.mouseHoverOver(testFields.${theSelector.title});\n`;
+
+    //return the string
+    return theString;
+}
+
+//DELETE COOKIES
+function convert_deleteAllCookies(x) {
+    //initialize string
+    var theString = ``;
+
+    //add comment and variable initialization
+    theString = `\n\t\t//Initialize for clearing cookies: ${x.target}\n\t\t`;
+    theString += `var browserTabs = await [];\n\t\tawait browserTabs.push(page);\n\t\t`;
+
+    theString += `\n\t\t//Clear all cookies\n\t\tfor (var i = 0; i < browserTabs.length; i++) {\n\t\t\tawait browserTabs[i]._client.send('Network.clearBrowserCookies');\n\t\t}\n\t\t`;
+
+    //return the string
+    return theString;
+}
+
+//temp
+function tempFunction(x) {
+    var theString = `\n\t\t//FUNCTION NOT CURRENTLY SUPPORTED\n\t\t//Function Attempted: ${x}`;
+}
