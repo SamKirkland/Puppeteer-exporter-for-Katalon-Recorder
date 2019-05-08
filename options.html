@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Options</title>
+        <style>
+            body {
+                width: 400px;
+                font-size: 14px;
+                padding: 0 20px 10px 20px;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+
+            .muted {
+                color: #666;
+            }
+
+            h5 {
+                margin-bottom: 0;
+            }
+            ul {
+                margin-top: 5px;
+            }
+            
+            #saved {
+                border: 1px solid #35995c;
+                color: #091b10;
+                background: #4fc27c;
+                padding: 3px 6px;
+                border-radius: 4px;
+                display: none;
+                float: right;
+            }
+        </style>
+    </head>
+    <body>
+        <p>
+            <label>
+                <input type="checkbox" id="enable">
+                Enable Google Analytics
+                <span id="saved">Saved!</span>
+                <br>
+            </label>
+            <br />
+            No private information is sent to googles servers, just basic usage information (<a href="https://github.com/SamKirkland/Puppeteer-exporter-for-Katalon-Recorder/blob/master/background.js#L3-L34" target="blank">see the source code as proof</a>)
+        </p>
+
+        <h5>Information Logged:</h5>
+        <ul>
+            <li>When you export a script to Puppeteer</li>
+            <li>When you export a script to JSON</li>
+        </ul>
+        
+        <p>
+            No information about the script is ever sent, just when it happens so I can see if anyone is even using this thing.
+        </p>
+
+        <script src="options.js"></script>
+    </body>
+</html>

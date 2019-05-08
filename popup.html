@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Options</title>
+        <style>
+            body {
+                width: 320px;
+                font-size: 14px;
+                padding: 15px;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                line-height: 20px;
+            }
+
+            p:first-child {
+                margin-top: 0;
+            }
+
+            .muted {
+                color: #666;
+            }
+
+            table {
+                width: 100%;
+            }
+            table td {
+                border-top: 1px solid #eee;
+                padding-top: 5px;
+                vertical-align: middle;
+            }
+            table td:first-child {
+                text-align: left;
+            }
+            table td:last-child {
+                text-align: right;
+                line-height: 14px;
+            }
+        </style>
+    </head>
+    <body>
+        <div>
+            <p>
+                This extension adds Puppeteer and JSON export support to the
+                <b><a href="https://chrome.google.com/webstore/detail/katalon-recorder/ljdobmomdgdljniojadhoplhkpialdid" target="blank">Katalon Recorder</a></b> extension.
+                You must have it installed in order to use this extension.
+            </p>
+            
+            <p class="muted">
+                Note: If you do not see Puppeteer as an option in the Export tab, please close Katalon Recorder and reopen it.
+            </p>
+
+            <table>
+                <tbody>
+                    <tr>
+                        <td>
+                            Found a bug?<br>
+                            Submit a github issue:
+                        </td>
+                        <td>
+                            <a class="github-button" data-size="large" href="https://github.com/SamKirkland/Puppeteer-exporter-for-Katalon-Recorder/issues" data-icon="octicon-issue-opened" aria-label="Issue SamKirkland/Puppeteer-exporter-for-Katalon-Recorder on GitHub">Issue</a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Appreciate this extension?<br>
+                            Star me on github:
+                        </td>
+                        <td>
+                            <a class="github-button" data-size="large" href="https://github.com/SamKirkland/Puppeteer-exporter-for-Katalon-Recorder" data-icon="octicon-star" aria-label="Star SamKirkland/Puppeteer-exporter-for-Katalon-Recorder on GitHub">Star</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <script src="popup.js"></script>
+    </body>
+</html>
